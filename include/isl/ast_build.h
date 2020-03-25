@@ -50,6 +50,7 @@ __isl_give isl_ast_build *isl_ast_build_alloc(isl_ctx *ctx);
 __isl_export
 __isl_give isl_ast_build *isl_ast_build_from_context(__isl_take isl_set *set);
 
+__isl_export
 __isl_give isl_space *isl_ast_build_get_schedule_space(
 	__isl_keep isl_ast_build *build);
 __isl_export
@@ -75,52 +76,65 @@ __isl_give isl_ast_build *isl_ast_build_set_at_each_domain(
 	__isl_take isl_ast_build *build,
 	__isl_give isl_ast_node *(*fn)(__isl_take isl_ast_node *node,
 		__isl_keep isl_ast_build *build, void *user), void *user);
+__isl_export
 __isl_give isl_ast_build *isl_ast_build_set_before_each_for(
 	__isl_take isl_ast_build *build,
 	__isl_give isl_id *(*fn)(__isl_keep isl_ast_build *build,
 		void *user), void *user);
+__isl_export
 __isl_give isl_ast_build *isl_ast_build_set_after_each_for(
 	__isl_take isl_ast_build *build,
 	__isl_give isl_ast_node *(*fn)(__isl_take isl_ast_node *node,
 		__isl_keep isl_ast_build *build, void *user), void *user);
+__isl_export
 __isl_give isl_ast_build *isl_ast_build_set_before_each_mark(
 	__isl_take isl_ast_build *build,
 	isl_stat (*fn)(__isl_keep isl_id *mark, __isl_keep isl_ast_build *build,
 		void *user), void *user);
+__isl_export
 __isl_give isl_ast_build *isl_ast_build_set_after_each_mark(
 	__isl_take isl_ast_build *build,
 	__isl_give isl_ast_node *(*fn)(__isl_take isl_ast_node *node,
 		__isl_keep isl_ast_build *build, void *user), void *user);
+__isl_export
 __isl_give isl_ast_build *isl_ast_build_set_create_leaf(
 	__isl_take isl_ast_build *build,
 	__isl_give isl_ast_node *(*fn)(__isl_take isl_ast_build *build,
 		void *user), void *user);
 
+__isl_export
 __isl_overload
 __isl_give isl_ast_expr *isl_ast_build_expr_from_set(
 	__isl_keep isl_ast_build *build, __isl_take isl_set *set);
+__isl_export
 __isl_overload
 __isl_give isl_ast_expr *isl_ast_build_expr_from_pw_aff(
 	__isl_keep isl_ast_build *build, __isl_take isl_pw_aff *pa);
+__isl_export
 __isl_overload
 __isl_give isl_ast_expr *isl_ast_build_access_from_pw_multi_aff(
 	__isl_keep isl_ast_build *build, __isl_take isl_pw_multi_aff *pma);
+__isl_export
 __isl_overload
 __isl_give isl_ast_expr *isl_ast_build_access_from_multi_pw_aff(
 	__isl_keep isl_ast_build *build, __isl_take isl_multi_pw_aff *mpa);
+__isl_export
 __isl_overload
 __isl_give isl_ast_expr *isl_ast_build_call_from_pw_multi_aff(
 	__isl_keep isl_ast_build *build, __isl_take isl_pw_multi_aff *pma);
+__isl_export
 __isl_overload
 __isl_give isl_ast_expr *isl_ast_build_call_from_multi_pw_aff(
 	__isl_keep isl_ast_build *build, __isl_take isl_multi_pw_aff *mpa);
 
+__isl_export
 __isl_overload
 __isl_give isl_ast_node *isl_ast_build_node_from_schedule(
 	__isl_keep isl_ast_build *build, __isl_take isl_schedule *schedule);
 __isl_export
 __isl_give isl_ast_node *isl_ast_build_node_from_schedule_map(
 	__isl_keep isl_ast_build *build, __isl_take isl_union_map *schedule);
+__isl_export
 __isl_give isl_ast_node *isl_ast_build_ast_from_schedule(
 	__isl_keep isl_ast_build *build, __isl_take isl_union_map *schedule);
 
