@@ -51,6 +51,9 @@ __isl_export
 __isl_give isl_ast_build *isl_ast_build_from_context(__isl_take isl_set *set);
 
 __isl_export
+__isl_give isl_space *isl_ast_build_get_space(
+	__isl_keep isl_ast_build *build, int internal);
+__isl_export
 __isl_give isl_space *isl_ast_build_get_schedule_space(
 	__isl_keep isl_ast_build *build);
 __isl_export
@@ -101,6 +104,32 @@ __isl_give isl_ast_build *isl_ast_build_set_create_leaf(
 	__isl_take isl_ast_build *build,
 	__isl_give isl_ast_node *(*fn)(__isl_take isl_ast_build *build,
 		void *user), void *user);
+
+__isl_export
+__isl_give isl_set *isl_ast_build_get_domain(
+	__isl_keep isl_ast_build *build);
+__isl_export
+__isl_give isl_set *isl_ast_build_get_pending(
+	__isl_keep isl_ast_build *build);
+__isl_export
+__isl_give isl_set *isl_ast_build_get_generated(
+	__isl_keep isl_ast_build *build);
+__isl_export
+isl_bool isl_ast_build_need_schedule_map(__isl_keep isl_ast_build *build);
+__isl_export
+__isl_give isl_multi_aff *isl_ast_build_get_schedule_map_multi_aff(
+	__isl_keep isl_ast_build *build);
+__isl_export
+__isl_give isl_map *isl_ast_build_get_schedule_map(
+	__isl_keep isl_ast_build *build);
+__isl_export
+isl_bool isl_ast_build_has_affine_value(__isl_keep isl_ast_build *build,
+	int pos);
+__isl_export
+int isl_ast_build_has_value(__isl_keep isl_ast_build *build);
+__isl_export
+__isl_give isl_id *isl_ast_build_get_iterator_id(
+	__isl_keep isl_ast_build *build, int pos);
 
 __isl_export
 __isl_overload

@@ -206,8 +206,6 @@ __isl_give isl_ast_build *isl_ast_build_increase_depth(
 int isl_ast_build_get_depth(__isl_keep isl_ast_build *build);
 isl_size isl_ast_build_dim(__isl_keep isl_ast_build *build,
 	enum isl_dim_type type);
-__isl_give isl_space *isl_ast_build_get_space(
-	__isl_keep isl_ast_build *build, int internal);
 __isl_give isl_ast_build *isl_ast_build_align_params(
 	__isl_take isl_ast_build *build, __isl_take isl_space *model);
 __isl_give isl_ast_build *isl_ast_build_cow(
@@ -234,26 +232,10 @@ __isl_give isl_ast_build *isl_ast_build_set_single_valued(
 	__isl_take isl_ast_build *build, int sv);
 __isl_give isl_multi_aff *isl_ast_build_get_internal2input(
 	__isl_keep isl_ast_build *build);
-__isl_give isl_set *isl_ast_build_get_domain(
-	__isl_keep isl_ast_build *build);
-__isl_give isl_set *isl_ast_build_get_pending(
-	__isl_keep isl_ast_build *build);
-__isl_give isl_set *isl_ast_build_get_generated(
-	__isl_keep isl_ast_build *build);
 __isl_give isl_ast_build *isl_ast_build_restrict_generated(
 	__isl_take isl_ast_build *build, __isl_take isl_set *set);
 __isl_give isl_ast_build *isl_ast_build_replace_pending_by_guard(
 	__isl_take isl_ast_build *build, __isl_take isl_set *guard);
-isl_bool isl_ast_build_need_schedule_map(__isl_keep isl_ast_build *build);
-__isl_give isl_multi_aff *isl_ast_build_get_schedule_map_multi_aff(
-	__isl_keep isl_ast_build *build);
-__isl_give isl_map *isl_ast_build_get_schedule_map(
-	__isl_keep isl_ast_build *build);
-isl_bool isl_ast_build_has_affine_value(__isl_keep isl_ast_build *build,
-	int pos);
-int isl_ast_build_has_value(__isl_keep isl_ast_build *build);
-__isl_give isl_id *isl_ast_build_get_iterator_id(
-	__isl_keep isl_ast_build *build, int pos);
 
 int isl_ast_build_has_schedule_node(__isl_keep isl_ast_build *build);
 __isl_give isl_schedule_node *isl_ast_build_get_schedule_node(
