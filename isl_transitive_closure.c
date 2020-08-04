@@ -1798,10 +1798,12 @@ static isl_bool basic_map_follows(int i, int j, void *user)
 	struct isl_tc_follows_data *data = user;
 	struct isl_map *map12 = NULL;
 	struct isl_map *map21 = NULL;
-	isl_bool subset;
+	isl_bool applies, subset;
 
-	if (!isl_space_tuple_is_equal(data->list[i]->dim, isl_dim_in,
-				    data->list[j]->dim, isl_dim_out))
+	applies = isl_basic_map_applies_range(data->list[j], data->list[i]);
+	if (applies < 0)
+		return isl_bool_error;
+	if (!applies)
 		return isl_bool_false;
 
 	map21 = isl_map_from_basic_map(
@@ -1816,10 +1818,8 @@ static isl_bool basic_map_follows(int i, int j, void *user)
 		return isl_bool_false;
 	}
 
-	if (!isl_space_tuple_is_equal(data->list[i]->dim, isl_dim_in,
-				    data->list[i]->dim, isl_dim_out) ||
-	    !isl_space_tuple_is_equal(data->list[j]->dim, isl_dim_in,
-				    data->list[j]->dim, isl_dim_out)) {
+	if (!isl_basic_map_is_transformation(data->list[i]) ||
+	    !isl_basic_map_is_transformation(data->list[j])) {
 		isl_map_free(map21);
 		return isl_bool_true;
 	}
@@ -2023,7 +2023,7 @@ static __isl_give isl_map *map_power(__isl_take isl_map *map,
 	if (exact)
 		*exact = isl_bool_true;
 
-	if (isl_map_check_equal_tuples(map) < 0)
+	if (isl_map_check_transformation(map) < 0)
 		return isl_map_free(map);
 
 	app = construct_power(map, exact, project);

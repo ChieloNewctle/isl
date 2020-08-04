@@ -242,8 +242,7 @@ error:
 
 /* Read an isl_val from "str".
  */
-struct isl_val *isl_val_read_from_str(struct isl_ctx *ctx,
-	const char *str)
+__isl_give isl_val *isl_val_read_from_str(isl_ctx *ctx, const char *str)
 {
 	isl_val *val;
 	isl_stream *s = isl_stream_new_str(ctx, str);
@@ -2065,7 +2064,7 @@ static __isl_give isl_map *read_conjuncts(__isl_keep isl_stream *s,
 	return res;
 }
 
-static struct isl_map *read_disjuncts(__isl_keep isl_stream *s,
+static __isl_give isl_map *read_disjuncts(__isl_keep isl_stream *s,
 	struct vars *v, __isl_take isl_map *map, int rational)
 {
 	isl_map *res;
@@ -2343,7 +2342,7 @@ error:
 	return NULL;
 }
 
-static struct isl_map *map_read_polylib(__isl_keep isl_stream *s)
+static __isl_give isl_map *map_read_polylib(__isl_keep isl_stream *s)
 {
 	struct isl_token *tok;
 	struct isl_token *tok2;
@@ -3176,7 +3175,7 @@ __isl_give isl_basic_set *isl_basic_set_read_from_file(isl_ctx *ctx,
 	return bset;
 }
 
-struct isl_basic_map *isl_basic_map_read_from_str(struct isl_ctx *ctx,
+__isl_give isl_basic_map *isl_basic_map_read_from_str(isl_ctx *ctx,
 	const char *str)
 {
 	struct isl_basic_map *bmap;
@@ -3188,7 +3187,7 @@ struct isl_basic_map *isl_basic_map_read_from_str(struct isl_ctx *ctx,
 	return bmap;
 }
 
-struct isl_basic_set *isl_basic_set_read_from_str(struct isl_ctx *ctx,
+__isl_give isl_basic_set *isl_basic_set_read_from_str(isl_ctx *ctx,
 	const char *str)
 {
 	isl_basic_set *bset;
@@ -3236,8 +3235,7 @@ __isl_give isl_set *isl_set_read_from_file(struct isl_ctx *ctx,
 	return set;
 }
 
-struct isl_set *isl_set_read_from_str(struct isl_ctx *ctx,
-	const char *str)
+__isl_give isl_set *isl_set_read_from_str(isl_ctx *ctx, const char *str)
 {
 	isl_set *set;
 	isl_stream *s = isl_stream_new_str(ctx, str);

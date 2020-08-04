@@ -1972,7 +1972,7 @@ error:
 	return NULL;
 }
 
-struct isl_basic_set *isl_set_convex_hull(struct isl_set *set)
+__isl_give isl_basic_set *isl_set_convex_hull(__isl_take isl_set *set)
 {
 	return bset_from_bmap(isl_map_convex_hull(set_to_map(set)));
 }
@@ -2476,7 +2476,7 @@ __isl_give isl_basic_map *isl_map_simple_hull(__isl_take isl_map *map)
 	return map_simple_hull(map, 1);
 }
 
-struct isl_basic_set *isl_set_simple_hull(struct isl_set *set)
+__isl_give isl_basic_set *isl_set_simple_hull(__isl_take isl_set *set)
 {
 	return bset_from_bmap(isl_map_simple_hull(set_to_map(set)));
 }
@@ -2616,12 +2616,10 @@ __isl_give isl_basic_map *isl_basic_map_plain_unshifted_simple_hull(
 	if (isl_basic_map_check_equal_space(bmap1, bmap2) < 0)
 		goto error;
 
-	bmap1 = isl_basic_map_drop_constraint_involving_unknown_divs(bmap1);
-	bmap2 = isl_basic_map_drop_constraint_involving_unknown_divs(bmap2);
+	bmap1 = isl_basic_map_drop_constraints_involving_unknown_divs(bmap1);
+	bmap2 = isl_basic_map_drop_constraints_involving_unknown_divs(bmap2);
 	bmap2 = isl_basic_map_align_divs(bmap2, bmap1);
 	bmap1 = isl_basic_map_align_divs(bmap1, bmap2);
-	bmap1 = isl_basic_map_gauss(bmap1, NULL);
-	bmap2 = isl_basic_map_gauss(bmap2, NULL);
 	bmap1 = isl_basic_map_sort_constraints(bmap1);
 	bmap2 = isl_basic_map_sort_constraints(bmap2);
 
@@ -2659,7 +2657,7 @@ __isl_give isl_basic_map *isl_map_plain_unshifted_simple_hull(
 		return NULL;
 	if (map->n <= 1)
 		return map_simple_hull_trivial(map);
-	map = isl_map_drop_constraint_involving_unknown_divs(map);
+	map = isl_map_drop_constraints_involving_unknown_divs(map);
 	hull = isl_basic_map_copy(map->p[0]);
 	for (i = 1; i < map->n; ++i) {
 		isl_basic_map *bmap_i;

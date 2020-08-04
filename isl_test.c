@@ -1374,6 +1374,34 @@ int test_affine_hull(struct isl_ctx *ctx)
 	return 0;
 }
 
+/* Test a special case of isl_set_plain_unshifted_simple_hull
+ * where older versions of isl would include a redundant constraint
+ * in the result.
+ * Check that the result does not have any constraints.
+ */
+static isl_stat test_plain_unshifted_simple_hull_special(isl_ctx *ctx)
+{
+	const char *str;
+	isl_bool is_universe;
+	isl_set *set;
+	isl_basic_set *bset;
+
+	str = "{[x, y] : x = 0 or 2*((x+y)//2) <= y + 2 }";
+	set = isl_set_read_from_str(ctx, str);
+	bset = isl_set_plain_unshifted_simple_hull(set);
+	is_universe = isl_basic_set_plain_is_universe(bset);
+	isl_basic_set_free(bset);
+
+	if (is_universe < 0)
+		return isl_stat_error;
+	if (!is_universe)
+		isl_die(ctx, isl_error_unknown,
+			"hull should not have any constraints",
+			return isl_stat_error);
+
+	return isl_stat_ok;
+}
+
 /* Pairs of maps and the corresponding expected results of
  * isl_map_plain_unshifted_simple_hull.
  */
@@ -1478,6 +1506,8 @@ static int test_simple_hull(struct isl_ctx *ctx)
 		isl_die(ctx, isl_error_unknown, "Empty set should be detected",
 			return -1);
 
+	if (test_plain_unshifted_simple_hull_special(ctx) < 0)
+		return -1;
 	if (test_plain_unshifted_simple_hull(ctx) < 0)
 		return -1;
 	if (test_unshifted_simple_hull(ctx) < 0)
@@ -1501,6 +1531,12 @@ static struct {
 	  "[N] -> { S[N, N] }", "{ S[10, 10] }" },
 	{ "{ S[x, y] : 0 <= x + y, x - y < 10 }",
 	  "{ S[0, -4] }", "{ S[10, 9] }" },
+	{ "{ [i=0:10] : exists (e0, e1: 3e1 >= 1 + 2e0 and "
+	    "8e1 <= -1 + 5i - 5e0 and 2e1 >= 1 + 2i - 5e0) }",
+	  "{ [3] }", "{ [8] }" },
+	{ "[N] -> { [w = 0:17] : exists (e0: w < 2N and "
+	    "-1 + w <= e0 <= w and 2e0 >= N + w and w <= 2e0 <= 15 + w) }",
+	  "[N] -> { [N] }", "{ [9] }" },
 };
 
 /* Perform basic isl_set_get_simple_fixed_box_hull tests.
@@ -1672,6 +1708,57 @@ void test_gist_case(struct isl_ctx *ctx, const char *name)
 	free(filename);
 
 	fclose(input);
+}
+
+/* Check that computing the gist of "map" with respect to "context"
+ * does not make any copy of "map" get marked empty.
+ * Earlier versions of isl would end up doing that.
+ */
+static isl_stat test_gist_empty_pair(isl_ctx *ctx, const char *map,
+	const char *context)
+{
+	isl_map *m1, *m2, *m3;
+	isl_bool empty_before, empty_after;
+
+	m1 = isl_map_read_from_str(ctx, map);
+	m2 = isl_map_read_from_str(ctx, context);
+	m3 = isl_map_copy(m1);
+	empty_before = isl_map_is_empty(m3);
+	m1 = isl_map_gist(m1, m2);
+	empty_after = isl_map_is_empty(m3);
+	isl_map_free(m1);
+	isl_map_free(m3);
+
+	if (empty_before < 0 || empty_after < 0)
+		return isl_stat_error;
+	if (empty_before)
+		isl_die(ctx, isl_error_unknown, "map should not be empty",
+			return isl_stat_error);
+	if (empty_after)
+		isl_die(ctx, isl_error_unknown, "map should still not be empty",
+			return isl_stat_error);
+
+	return isl_stat_ok;
+}
+
+/* Check that computing a gist does not make any copy of the input
+ * get marked empty.
+ * Earlier versions of isl would end up doing that on some pairs of inputs.
+ */
+static isl_stat test_gist_empty(isl_ctx *ctx)
+{
+	const char *map, *context;
+
+	map = "{ [] -> [a, b, c] : 2b = 1 + a }";
+	context = "{ [] -> [a, b, c] : 2c = 2 + a }";
+	if (test_gist_empty_pair(ctx, map, context) < 0)
+		return isl_stat_error;
+	map = "{ [] -> [0, 0] }";
+	context = "{ [] -> [a, b] : a > b }";
+	if (test_gist_empty_pair(ctx, map, context) < 0)
+		return isl_stat_error;
+
+	return isl_stat_ok;
 }
 
 /* Inputs to isl_map_plain_gist_basic_map, along with the expected output.
@@ -1947,6 +2034,8 @@ static int test_gist(struct isl_ctx *ctx)
 		isl_die(ctx, isl_error_unknown, "expecting single div",
 			return -1);
 
+	if (test_gist_empty(ctx) < 0)
+		return -1;
 	if (test_plain_gist(ctx) < 0)
 		return -1;
 
@@ -2292,6 +2381,8 @@ struct {
 	{ 0, "{ [j, a, l] : a mod 2 = 0 and j <= 29 and a >= 2 and "
 			"2a <= -5 + j and 32j + 2a + 2 <= 4l < 33j; "
 		"[j, 0, l] : 4 <= j <= 29 and -3 + 33j <= 4l <= 33j }" },
+	{ 1, "{ [a] : (a = 0 or ((1 + a) mod 2 = 0 and 0 < a <= 15) or "
+		"((a) mod 2 = 0 and 0 < a <= 15)) }" },
 };
 
 /* A specialized coalescing test case that would result
@@ -2890,6 +2981,7 @@ struct {
 	    "[a] -> [b = 0] : 0 < a <= 509 }" },
 	{ "{ rat: [i] : 1 <= 2i <= 9 }", "{ rat: [i] : 2i = 1 }" },
 	{ "{ rat: [i] : 1 <= 2i <= 9 or i >= 10 }", "{ rat: [i] : 2i = 1 }" },
+	{ "{ rat: [i] : 21 <= 2i <= 29 or i = 5 }", "{ rat: [5] }" },
 };
 
 static int test_lexmin(struct isl_ctx *ctx)
@@ -2972,6 +3064,44 @@ static int test_lexmin(struct isl_ctx *ctx)
 			"piecewise affine expression", return -1);
 
 	return 0;
+}
+
+/* Inputs for isl_pw_multi_aff_max_multi_val tests.
+ * "pma" is the input.
+ * "res" is the expected result.
+ */
+static struct {
+	const char *pma;
+	const char *res;
+} opt_pw_tests[] = {
+	{ "{ [-1] -> [-1]; [1] -> [1] }", "{ [1] }" },
+	{ "{ [a, b] -> [floor((b - 2*floor((-a)/4))/5)] : "
+	    "0 <= a, b <= 100 and b mod 2 = 0}", "{ [30] }" },
+	{ "[N] -> { [i,j] -> A[i, -i, i + j] : 0 <= i,j <= N <= 10 }",
+	  "{ A[10, 0, 20] }" },
+	{ "[N] -> {A[N, -N, 2N] : 0 <= N }", "{ A[infty, 0, infty] }" },
+};
+
+/* Perform basic isl_pw_multi_aff_max_multi_val tests.
+ */
+static isl_stat test_pw_max(struct isl_ctx *ctx)
+{
+	int i;
+	isl_pw_multi_aff *pma;
+	isl_multi_val *mv;
+	isl_stat r;
+
+	for (i = 0; i < ARRAY_SIZE(opt_pw_tests); ++i) {
+		pma = isl_pw_multi_aff_read_from_str(ctx, opt_pw_tests[i].pma);
+		mv = isl_pw_multi_aff_max_multi_val(pma);
+		r = multi_val_check_plain_equal(mv, opt_pw_tests[i].res);
+		isl_multi_val_free(mv);
+
+		if (r < 0)
+			return isl_stat_error;
+	}
+
+	return isl_stat_ok;
 }
 
 /* A specialized isl_set_min_val test case that would return the wrong result
@@ -3083,6 +3213,8 @@ static int test_min(struct isl_ctx *ctx)
 				"unexpected optimum", return -1);
 	}
 
+	if (test_pw_max(ctx) < 0)
+		return -1;
 	if (test_min_special(ctx) < 0)
 		return -1;
 	if (test_min_special2(ctx) < 0)
@@ -3965,6 +4097,26 @@ static int test_subset(isl_ctx *ctx)
 	return 0;
 }
 
+/* Perform a set subtraction with a set that has a non-obviously empty disjunct.
+ * Older versions of isl would fail on such cases.
+ */
+static isl_stat test_subtract_empty(isl_ctx *ctx)
+{
+	const char *str;
+	isl_set *s1, *s2;
+
+	s1 = isl_set_read_from_str(ctx, "{ [0] }");
+	str = "{ [a] : (exists (e0, e1, e2: 1056e1 <= 32 + a - 33e0 and "
+			"1089e1 >= a - 33e0 and 1089e1 <= 1 + a - 33e0 and "
+			"33e2 >= -a + 33e0 + 1056e1 and "
+			"33e2 < -2a + 66e0 + 2112e1)) or a = 0 }";
+	s2 = isl_set_read_from_str(ctx, str);
+	s1 = isl_set_subtract(s1, s2);
+	isl_set_free(s1);
+
+	return isl_stat_non_null(s1);
+}
+
 struct {
 	const char *minuend;
 	const char *subtrahend;
@@ -3982,6 +4134,9 @@ static int test_subtract(isl_ctx *ctx)
 	isl_union_pw_multi_aff *upma1, *upma2;
 	isl_union_set *uset;
 	int equal;
+
+	if (test_subtract_empty(ctx) < 0)
+		return -1;
 
 	for (i = 0; i < ARRAY_SIZE(subtract_domain_tests); ++i) {
 		umap1 = isl_union_map_read_from_str(ctx,
@@ -5256,6 +5411,8 @@ struct {
 	  "{ [i] -> [NaN] }" },
 	{ "{ [i] -> [NaN] }", '/', "{ [i] -> [i] }",
 	  "{ [i] -> [NaN] }" },
+	{ "{ [i] -> [i] }", '/', "{ [i] -> [0] }",
+	  "{ [i] -> [NaN] }" },
 };
 
 /* Perform some basic tests of binary operations on isl_aff objects.
@@ -5349,6 +5506,66 @@ static int test_bin_pw_aff(isl_ctx *ctx)
 	}
 
 	return 0;
+}
+
+/* Inputs for basic tests of test operations on
+ * isl_union_pw_multi_aff objects.
+ * "fn" is the function that is being tested.
+ * "arg" is a string description of the input.
+ * "res" is the expected result.
+ */
+static struct {
+	isl_bool (*fn)(__isl_keep isl_union_pw_multi_aff *upma1);
+	const char *arg;
+	isl_bool res;
+} upma_test_tests[] = {
+	{ &isl_union_pw_multi_aff_involves_nan, "{ A[] -> [0]; B[0] -> [1] }",
+	  isl_bool_false },
+	{ &isl_union_pw_multi_aff_involves_nan, "{ A[] -> [NaN]; B[0] -> [1] }",
+	  isl_bool_true },
+	{ &isl_union_pw_multi_aff_involves_nan, "{ A[] -> [0]; B[0] -> [NaN] }",
+	  isl_bool_true },
+	{ &isl_union_pw_multi_aff_involves_nan,
+	  "{ A[] -> [0]; B[0] -> [1, NaN, 5] }",
+	  isl_bool_true },
+	{ &isl_union_pw_multi_aff_involves_locals,
+	  "{ A[] -> [0]; B[0] -> [1] }",
+	  isl_bool_false },
+	{ &isl_union_pw_multi_aff_involves_locals,
+	  "{ A[] -> [0]; B[x] -> [1] : x mod 2 = 0 }",
+	  isl_bool_true },
+	{ &isl_union_pw_multi_aff_involves_locals,
+	  "{ A[] -> [0]; B[x] -> [x // 2] }",
+	  isl_bool_true },
+	{ &isl_union_pw_multi_aff_involves_locals,
+	  "{ A[i] -> [i // 2]; B[0] -> [1] }",
+	  isl_bool_true },
+};
+
+/* Perform some basic tests of test operations on
+ * isl_union_pw_multi_aff objects.
+ */
+static isl_stat test_upma_test(isl_ctx *ctx)
+{
+	int i;
+	isl_union_pw_multi_aff *upma;
+	isl_bool res;
+
+	for (i = 0; i < ARRAY_SIZE(upma_test_tests); ++i) {
+		const char *str;
+
+		str = upma_test_tests[i].arg;
+		upma = isl_union_pw_multi_aff_read_from_str(ctx, str);
+		res = upma_test_tests[i].fn(upma);
+		isl_union_pw_multi_aff_free(upma);
+		if (res < 0)
+			return isl_stat_error;
+		if (res != upma_test_tests[i].res)
+			isl_die(ctx, isl_error_unknown,
+				"unexpected result", return isl_stat_error);
+	}
+
+	return isl_stat_ok;
 }
 
 struct {
@@ -6525,6 +6742,8 @@ int test_aff(isl_ctx *ctx)
 		return -1;
 	if (test_bin_pw_aff(ctx) < 0)
 		return -1;
+	if (test_upma_test(ctx) < 0)
+		return -1;
 	if (test_bin_upma(ctx) < 0)
 		return -1;
 	if (test_bin_upma_fail(ctx) < 0)
@@ -7122,6 +7341,60 @@ static isl_stat test_unbind_aff(isl_ctx *ctx)
 	return isl_stat_ok;
 }
 
+/* Inputs for isl_multi_aff_unbind_params_insert_domain tests.
+ * "ma" is the input multi affine expression defined over a parameter domain.
+ * "tuple" is the tuple of the domain that gets introduced.
+ * "res" is the expected result.
+ */
+static struct {
+	const char *ma;
+	const char *tuple;
+	const char *res;
+} unbind_multi_aff_tests[] = {
+	{ "[M, N] -> { T[M + floor(N/2)] }",
+	  "{ A[M, N] }",
+	  "{ A[M, N] -> T[M + floor(N/2)] }" },
+	{ "[M, N] -> { [M + floor(N/2)] }",
+	  "{ B[N, M] }",
+	  "{ B[N, M] -> [M + floor(N/2)] }" },
+	{ "[M, N] -> { [M + floor(N/2)] }",
+	  "{ C[N] }",
+	  "[M] -> { C[N] -> [M + floor(N/2)] }" },
+	{ "[M, N] -> { [M + floor(N/2)] }",
+	  "{ D[A, B, C, N, Z] }",
+	  "[M] -> { D[A, B, C, N, Z] -> [M + floor(N/2)] }" },
+	{ "[M, N] -> { T[M + floor(N/2), N + floor(M/3)] }",
+	  "{ A[M, N] }",
+	  "{ A[M, N] -> T[M + floor(N/2), N + floor(M/3)] }" },
+};
+
+/* Perform basic isl_multi_aff_unbind_params_insert_domain tests.
+ */
+static isl_stat test_unbind_multi_aff(isl_ctx *ctx)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(unbind_multi_aff_tests); ++i) {
+		const char *str;
+		isl_multi_aff *ma;
+		isl_multi_id *tuple;
+		isl_stat r;
+
+		str = unbind_multi_aff_tests[i].ma;
+		ma = isl_multi_aff_read_from_str(ctx, str);
+		str = unbind_multi_aff_tests[i].tuple;
+		tuple = isl_multi_id_read_from_str(ctx, str);
+		ma = isl_multi_aff_unbind_params_insert_domain(ma, tuple);
+		str = unbind_multi_aff_tests[i].res;
+		r = multi_aff_check_plain_equal(ma, str);
+		isl_multi_aff_free(ma);
+		if (r < 0)
+			return isl_stat_error;
+	}
+
+	return isl_stat_ok;
+}
+
 /* Perform tests that reinterpret parameters.
  */
 static int test_unbind(isl_ctx *ctx)
@@ -7129,6 +7402,8 @@ static int test_unbind(isl_ctx *ctx)
 	if (test_unbind_set(ctx) < 0)
 		return -1;
 	if (test_unbind_aff(ctx) < 0)
+		return -1;
+	if (test_unbind_multi_aff(ctx) < 0)
 		return -1;
 
 	return 0;
@@ -7724,13 +7999,44 @@ static isl_stat test_bin_union_map(isl_ctx *ctx)
 	return isl_stat_ok;
 }
 
-/* Perform basic tests of operations on isl_union_map.
+/* Check that isl_union_set_contains finds space independently
+ * of the parameters.
+ */
+static isl_stat test_union_set_contains(isl_ctx *ctx)
+{
+	const char *str;
+	isl_bool ok;
+	isl_space *space;
+	isl_id *id;
+	isl_union_set *uset;
+
+	str = "[N] -> { A[0:N]; B[*,*] }";
+	uset = isl_union_set_read_from_str(ctx, str);
+	space = isl_space_unit(ctx);
+	id = isl_id_alloc(ctx, "A", NULL);
+	space = isl_space_add_named_tuple_id_ui(space, id, 1);
+	ok = isl_union_set_contains(uset, space);
+	isl_space_free(space);
+	isl_union_set_free(uset);
+
+	if (ok < 0)
+		return isl_stat_error;
+	if (!ok)
+		isl_die(ctx, isl_error_unknown,
+			"unexpected result", return isl_stat_error);
+
+	return isl_stat_ok;
+}
+
+/* Perform basic tests of operations on isl_union_map or isl_union_set.
  */
 static int test_union_map(isl_ctx *ctx)
 {
 	if (test_un_union_map(ctx) < 0)
 		return -1;
 	if (test_bin_union_map(ctx) < 0)
+		return -1;
+	if (test_union_set_contains(ctx) < 0)
 		return -1;
 	return 0;
 }
@@ -7909,6 +8215,72 @@ static int test_bin_locus(isl_ctx *ctx)
 	return 0;
 }
 
+/* Inputs for basic tests of functions that determine
+ * the part of the domain where two isl_multi_aff objects
+ * related to each other in a specific way.
+ * "fn" is the function that is being tested.
+ * "arg1" and "arg2" are string descriptions of the inputs.
+ * "res" is a string description of the expected result.
+ */
+static struct {
+	__isl_give isl_set *(*fn)(__isl_take isl_multi_aff *ma1,
+		__isl_take isl_multi_aff *ma2);
+	const char *arg1;
+	const char *arg2;
+	const char *res;
+} bin_locus_ma_tests[] = {
+	{ &isl_multi_aff_lex_le_set, "{ [] }", "{ [] }", "{ : }" },
+	{ &isl_multi_aff_lex_lt_set, "{ [] }", "{ [] }", "{ : false }" },
+	{ &isl_multi_aff_lex_le_set,
+	  "{ A[i] -> [i] }", "{ A[i] -> [0] }",
+	  "{ A[i] : i <= 0 }" },
+	{ &isl_multi_aff_lex_lt_set,
+	  "{ A[i] -> [i] }", "{ A[i] -> [0] }",
+	  "{ A[i] : i < 0 }" },
+	{ &isl_multi_aff_lex_le_set,
+	  "{ A[i] -> [i, i] }", "{ A[i] -> [0, 0] }",
+	  "{ A[i] : i <= 0 }" },
+	{ &isl_multi_aff_lex_le_set,
+	  "{ A[i] -> [i, 0] }", "{ A[i] -> [0, 0] }",
+	  "{ A[i] : i <= 0 }" },
+	{ &isl_multi_aff_lex_le_set,
+	  "{ A[i] -> [i, 1] }", "{ A[i] -> [0, 0] }",
+	  "{ A[i] : i < 0 }" },
+};
+
+/* Perform some basic tests of functions that determine
+ * the part of the domain where two isl_multi_aff objects
+ * related to each other in a specific way.
+ */
+static isl_stat test_bin_locus_ma(isl_ctx *ctx)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(bin_locus_ma_tests); ++i) {
+		const char *str;
+		isl_bool ok;
+		isl_multi_aff *ma1, *ma2;
+		isl_set *set, *res;
+
+		str = bin_locus_ma_tests[i].arg1;
+		ma1 = isl_multi_aff_read_from_str(ctx, str);
+		str = bin_locus_ma_tests[i].arg2;
+		ma2 = isl_multi_aff_read_from_str(ctx, str);
+		res = isl_set_read_from_str(ctx, bin_locus_ma_tests[i].res);
+		set = bin_locus_ma_tests[i].fn(ma1, ma2);
+		ok = isl_set_is_equal(set, res);
+		isl_set_free(set);
+		isl_set_free(res);
+		if (ok < 0)
+			return isl_stat_error;
+		if (!ok)
+			isl_die(ctx, isl_error_unknown,
+				"unexpected result", return isl_stat_error);
+	}
+
+	return isl_stat_ok;
+}
+
 /* Perform basic locus tests.
  */
 static int test_locus(isl_ctx *ctx)
@@ -7916,6 +8288,8 @@ static int test_locus(isl_ctx *ctx)
 	if (test_un_locus(ctx) < 0)
 		return -1;
 	if (test_bin_locus(ctx) < 0)
+		return -1;
+	if (test_bin_locus_ma(ctx) < 0)
 		return -1;
 	return 0;
 }
