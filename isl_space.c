@@ -2595,7 +2595,11 @@ uint32_t isl_space_get_tuple_hash(__isl_keep isl_space *space)
 	return hash;
 }
 
-uint32_t isl_space_get_hash(__isl_keep isl_space *space)
+/* Return the hash value of "space".
+ * Changes in this function should be reflected
+ * in isl_space_get_full_domain_hash.
+ */
+uint32_t isl_space_get_full_hash(__isl_keep isl_space *space)
 {
 	uint32_t hash;
 
@@ -2610,10 +2614,10 @@ uint32_t isl_space_get_hash(__isl_keep isl_space *space)
 }
 
 /* Return the hash value of the domain of "space".
- * That is, isl_space_get_domain_hash(space) is equal to
- * isl_space_get_hash(isl_space_domain(space)).
+ * That is, isl_space_get_full_domain_hash(space) is equal to
+ * isl_space_get_full_hash(isl_space_domain(space)).
  */
-uint32_t isl_space_get_domain_hash(__isl_keep isl_space *space)
+uint32_t isl_space_get_full_domain_hash(__isl_keep isl_space *space)
 {
 	uint32_t hash;
 

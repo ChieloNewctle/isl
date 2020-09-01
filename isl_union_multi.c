@@ -164,8 +164,10 @@ static isl_bool FN(UNION,has_space)(const void *entry, const void *val)
 {
 	PART *part = (PART *) entry;
 	isl_space *space = (isl_space *) val;
+	isl_space *part_space;
 
-	return isl_space_is_equal(part->dim, space);
+	part_space = FN(PART,peek_space)(part);
+	return isl_space_is_equal(part_space, space);
 }
 
 /* Return a group equal to "group", but with a single reference.
@@ -254,7 +256,7 @@ static struct isl_hash_table_entry *FN(UNION,find_part_entry)(
 		return NULL;
 
 	ctx = FN(UNION,get_ctx)(u);
-	hash = isl_space_get_domain_hash(space);
+	hash = isl_space_get_full_domain_hash(space);
 	group_entry = isl_hash_table_find(ctx, &u->table, hash,
 			&FN(UNION,group_has_same_domain_space), space, reserve);
 	if (!group_entry || group_entry == isl_hash_table_entry_none)
@@ -270,7 +272,7 @@ static struct isl_hash_table_entry *FN(UNION,find_part_entry)(
 	}
 	if (!group)
 		return NULL;
-	hash = isl_space_get_hash(space);
+	hash = isl_space_get_full_hash(space);
 	return isl_hash_table_find(ctx, &group->part_table, hash,
 				&FN(UNION,has_space), space, reserve);
 }
@@ -297,7 +299,7 @@ static __isl_give UNION *FN(UNION,remove_part_entry)(__isl_take UNION *u,
 	part = part_entry->data;
 	ctx = FN(UNION,get_ctx)(u);
 	space = FN(PART,peek_space)(part);
-	hash = isl_space_get_domain_hash(space);
+	hash = isl_space_get_full_domain_hash(space);
 	group_entry = isl_hash_table_find(ctx, &u->table, hash,
 			    &FN(UNION,group_has_same_domain_space), space, 0);
 	if (!group_entry)
@@ -383,7 +385,7 @@ static isl_stat FN(UNION,check_disjoint_domain_other)(__isl_keep UNION *u,
 		return isl_stat_error;
 	ctx = FN(UNION,get_ctx)(u);
 	space = FN(PART,peek_space)(part);
-	hash = isl_space_get_domain_hash(space);
+	hash = isl_space_get_full_domain_hash(space);
 	group_entry = isl_hash_table_find(ctx, &u->table, hash,
 			    &FN(UNION,group_has_same_domain_space), space, 0);
 	if (!group_entry)

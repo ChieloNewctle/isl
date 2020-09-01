@@ -2088,6 +2088,13 @@ struct {
 	{ 1, "{ [x,y] : (0 <= x,y <= 4) or (2 <= x,y <= 5 and x + y <= 9) }" },
 	{ 0, "{ [x, y, z] : 0 <= x,y,z <= 100 and 0 < z <= 2 + 2x + 2y; "
 		"[x, y, 0] : x,y <= 100 and y <= 9 + 11x and x <= 9 + 11y }" },
+	{ 1, "{ [0:1, 0:1]; [0, 2:3] }" },
+	{ 1, "{ [0:1, 0:1]; [0, 2:3]; [1, -2:-1] }" },
+	{ 1, "{ [0:3, 0:1]; [1:2, 2:5] }" },
+	{ 1, "{ [0:3, 0:1]; [0:2, 2:5] }" },
+	{ 1, "{ [0:3, 0:1]; [1:3, 2:5] }" },
+	{ 0, "{ [0:3, 0:1]; [1:4, 2:5] }" },
+	{ 0, "{ [0:3, 0:1]; [1:5, 2:5] }" },
 };
 
 /* Test the functionality of isl_set_coalesce with the bounded wrapping
@@ -2381,6 +2388,7 @@ struct {
 	{ 0, "{ [j, a, l] : a mod 2 = 0 and j <= 29 and a >= 2 and "
 			"2a <= -5 + j and 32j + 2a + 2 <= 4l < 33j; "
 		"[j, 0, l] : 4 <= j <= 29 and -3 + 33j <= 4l <= 33j }" },
+	{ 0, "{ [0:1, 0:1]; [0, 2:3] }" },
 	{ 1, "{ [a] : (a = 0 or ((1 + a) mod 2 = 0 and 0 < a <= 15) or "
 		"((a) mod 2 = 0 and 0 < a <= 15)) }" },
 };
@@ -7930,6 +7938,18 @@ static struct {
 	  "[n] -> { A[i] -> [] : 0 <= i <= n; B[] -> [] }",
 	  "[m] -> { A[i] -> [] : 0 <= i <= m; C[] -> [] }",
 	  "[m, n] -> { A[i] -> [] : 0 <= i <= n and i <= m }" },
+	{ &isl_union_map_intersect_domain_factor_domain,
+	  "{ [A[i] -> B[i + 1]] -> C[i + 2] }",
+	  "[N] -> { B[i] -> C[N] }",
+	  "{ }" },
+	{ &isl_union_map_intersect_domain_factor_domain,
+	  "{ [A[i] -> B[i + 1]] -> C[i + 2] }",
+	  "[N] -> { A[i] -> C[N] }",
+	  "[N] -> { [A[N - 2] -> B[N - 1]] -> C[N] }" },
+	{ &isl_union_map_intersect_domain_factor_domain,
+	  "{ T[A[i] -> B[i + 1]] -> C[i + 2] }",
+	  "[N] -> { A[i] -> C[N] }",
+	  "[N] -> { T[A[N - 2] -> B[N - 1]] -> C[N] }" },
 	{ &isl_union_map_intersect_domain_factor_range,
 	  "{ [A[i] -> B[i + 1]] -> C[i + 2] }",
 	  "[N] -> { B[i] -> C[N] }",
@@ -9471,7 +9491,7 @@ static __isl_give isl_id *before_for(__isl_keep isl_ast_build *build,
 	if (data->before >= 3)
 		isl_die(ctx, isl_error_unknown,
 			"unexpected number of for nodes", return NULL);
-	if (data->depth >= 2)
+	if (data->depth < 0 || data->depth >= 2)
 		isl_die(ctx, isl_error_unknown,
 			"unexpected depth", return NULL);
 
@@ -10563,9 +10583,9 @@ static int test_domain_hash(isl_ctx *ctx)
 	map = isl_map_read_from_str(ctx, "[n] -> { A[B[x] -> C[]] -> D[] }");
 	space = isl_map_get_space(map);
 	isl_map_free(map);
-	hash1 = isl_space_get_domain_hash(space);
+	hash1 = isl_space_get_full_domain_hash(space);
 	space = isl_space_domain(space);
-	hash2 = isl_space_get_hash(space);
+	hash2 = isl_space_get_full_hash(space);
 	isl_space_free(space);
 
 	if (!space)
