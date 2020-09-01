@@ -51,3 +51,10 @@ operations you use.
    volume = {6327},
    year = {2010}
 }
+
+
+Building the library requires:
+- automake, autoconf, libtool
+- pkg-config
+- libclang-dev, for interface extraction
+
