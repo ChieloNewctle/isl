@@ -1683,33 +1683,6 @@ static int test_convex_hull(isl_ctx *ctx)
 	return 0;
 }
 
-void test_gist_case(struct isl_ctx *ctx, const char *name)
-{
-	char *filename;
-	FILE *input;
-	struct isl_basic_set *bset1, *bset2;
-
-	filename = get_filename(ctx, name, "polylib");
-	assert(filename);
-	input = fopen(filename, "r");
-	assert(input);
-
-	bset1 = isl_basic_set_read_from_file(ctx, input);
-	bset2 = isl_basic_set_read_from_file(ctx, input);
-
-	bset1 = isl_basic_set_gist(bset1, bset2);
-
-	bset2 = isl_basic_set_read_from_file(ctx, input);
-
-	assert(isl_basic_set_is_equal(bset1, bset2) == 1);
-
-	isl_basic_set_free(bset1);
-	isl_basic_set_free(bset2);
-	free(filename);
-
-	fclose(input);
-}
-
 /* Check that computing the gist of "map" with respect to "context"
  * does not make any copy of "map" get marked empty.
  * Earlier versions of isl would end up doing that.
@@ -1858,6 +1831,9 @@ struct {
 	const char *context;
 	const char *gist;
 } gist_tests[] = {
+	{ "{ [1, -1, 3] }",
+	  "{ [1, b, 2 - b] : -1 <= b <= 2 }",
+	  "{ [a, -1, c] }" },
 	{ "{ [a, b, c] : a <= 15 and a >= 1 }",
 	  "{ [a, b, c] : exists (e0 = floor((-1 + a)/16): a >= 1 and "
 			"c <= 30 and 32e0 >= -62 + 2a + 2b - c and b >= 0) }",
@@ -1981,8 +1957,6 @@ static int test_gist(struct isl_ctx *ctx)
 
 	if (test_gist_fail(ctx) < 0)
 		return -1;
-
-	test_gist_case(ctx, "gist1");
 
 	str = "[p0, p2, p3, p5, p6, p10] -> { [] : "
 	    "exists (e0 = [(15 + p0 + 15p6 + 15p10)/16], e1 = [(p5)/8], "
@@ -3177,6 +3151,53 @@ static int test_min_special2(isl_ctx *ctx)
 	return 0;
 }
 
+/* Check that the result of isl_set_min_multi_pw_aff
+ * on the union of the sets with string descriptions "s1" and "s2"
+ * consists of a single expression (on a single cell).
+ */
+static isl_stat check_single_expr_min(isl_ctx *ctx, const char *s1,
+	const char *s2)
+{
+	isl_size n;
+	isl_set *set1, *set2;
+	isl_multi_pw_aff *mpa;
+	isl_pw_multi_aff *pma;
+
+	set1 = isl_set_read_from_str(ctx, s1);
+	set2 = isl_set_read_from_str(ctx, s2);
+	set1 = isl_set_union(set1, set2);
+	mpa = isl_set_min_multi_pw_aff(set1);
+	pma = isl_pw_multi_aff_from_multi_pw_aff(mpa);
+	n = isl_pw_multi_aff_n_piece(pma);
+	isl_pw_multi_aff_free(pma);
+
+	if (n < 0)
+		return isl_stat_error;
+	if (n != 1)
+		isl_die(ctx, isl_error_unknown, "expecting single expression",
+			return isl_stat_error);
+	return isl_stat_ok;
+}
+
+/* A specialized isl_set_min_multi_pw_aff test that checks
+ * that the minimum of 2N and 3N for N >= 0 is represented
+ * by a single expression, without splitting off the special case N = 0.
+ * Do this for both orderings.
+ */
+static int test_min_mpa(isl_ctx *ctx)
+{
+	const char *s1, *s2;
+
+	s1 = "[N=0:] -> { [1, 3N:] }";
+	s2 = "[N=0:] -> { [10, 2N:] }";
+	if (check_single_expr_min(ctx, s1, s2) < 0)
+		return -1;
+	if (check_single_expr_min(ctx, s2, s1) < 0)
+		return -1;
+
+	return 0;
+}
+
 struct {
 	const char *set;
 	const char *obj;
@@ -3900,6 +3921,27 @@ static int test_bound_unbounded_domain(isl_ctx *ctx)
 	return 0;
 }
 
+/* Check that the bound computation can handle differences
+ * in domain dimension names of the input polynomial and its domain.
+ */
+static isl_stat test_bound_space(isl_ctx *ctx)
+{
+	const char *str;
+	isl_set *set;
+	isl_pw_qpolynomial *pwqp;
+	isl_pw_qpolynomial_fold *pwf;
+
+	str = "{ [[c] -> [c]] }";
+	set = isl_set_read_from_str(ctx, str);
+	str = "{ [[a] -> [b]] -> 1 }";
+	pwqp = isl_pw_qpolynomial_read_from_str(ctx, str);
+	pwqp = isl_pw_qpolynomial_intersect_domain(pwqp, set);
+	pwf = isl_pw_qpolynomial_bound(pwqp, isl_fold_max, NULL);
+	isl_pw_qpolynomial_fold_free(pwf);
+
+	return isl_stat_non_null(pwf);
+}
+
 static int test_bound(isl_ctx *ctx)
 {
 	const char *str;
@@ -3908,6 +3950,8 @@ static int test_bound(isl_ctx *ctx)
 	isl_pw_qpolynomial_fold *pwf;
 
 	if (test_bound_unbounded_domain(ctx) < 0)
+		return -1;
+	if (test_bound_space(ctx) < 0)
 		return -1;
 
 	str = "{ [[a, b, c, d] -> [e]] -> 0 }";
@@ -5600,6 +5644,26 @@ struct {
 	{ &isl_union_pw_multi_aff_union_add, "{ B[x] -> A[1] : x <= 0 }",
 	  "{ B[x] -> A[2] : x >= 0 }",
 	  "{ B[x] -> A[1] : x < 0; B[x] -> A[2] : x > 0; B[0] -> A[3] }" },
+	{
+  &isl_union_pw_multi_aff_preimage_domain_wrapped_domain_union_pw_multi_aff,
+	  "{ B[x] -> C[x + 2] }",
+	  "{ D[y] -> B[2y] }",
+	  "{ }" },
+	{
+  &isl_union_pw_multi_aff_preimage_domain_wrapped_domain_union_pw_multi_aff,
+	  "{ [A[x] -> B[x + 1]] -> C[x + 2] }",
+	  "{ D[y] -> B[2y] }",
+	  "{ }" },
+	{
+  &isl_union_pw_multi_aff_preimage_domain_wrapped_domain_union_pw_multi_aff,
+	  "{ [A[x] -> B[x + 1]] -> C[x + 2]; B[x] -> C[x + 2] }",
+	  "{ D[y] -> A[2y] }",
+	  "{ [D[y] -> B[2y + 1]] -> C[2y + 2] }" },
+	{
+  &isl_union_pw_multi_aff_preimage_domain_wrapped_domain_union_pw_multi_aff,
+	  "{ T[A[x] -> B[x + 1]] -> C[x + 2]; B[x] -> C[x + 2] }",
+	  "{ D[y] -> A[2y] }",
+	  "{ T[D[y] -> B[2y + 1]] -> C[2y + 2] }" },
 };
 
 /* Perform some basic tests of binary operations on
@@ -8172,11 +8236,21 @@ struct {
 	  "{ A[i,j] -> B[i',j'] }",
 	  "F[{ A[i,j] -> [i] : i > j; B[i,j] -> [i] }]",
 	  "{ A[i,j] -> B[i,j'] : i > j }" },
+	{ &isl_union_map_lex_le_at_multi_union_pw_aff,
+	  "{ A[i,j] -> B[i',j'] }",
+	  "F[{ A[i,j] -> [i]; B[i,j] -> [i] }, "
+	    "{ A[i,j] -> [j]; B[i,j] -> [j] }]",
+	  "{ A[i,j] -> B[i',j'] : i,j <<= i',j' }" },
 	{ &isl_union_map_lex_lt_at_multi_union_pw_aff,
 	  "{ A[i,j] -> B[i',j'] }",
 	  "F[{ A[i,j] -> [i]; B[i,j] -> [i] }, "
 	    "{ A[i,j] -> [j]; B[i,j] -> [j] }]",
 	  "{ A[i,j] -> B[i',j'] : i,j << i',j' }" },
+	{ &isl_union_map_lex_ge_at_multi_union_pw_aff,
+	  "{ A[i,j] -> B[i',j'] }",
+	  "F[{ A[i,j] -> [i]; B[i,j] -> [i] }, "
+	    "{ A[i,j] -> [j]; B[i,j] -> [j] }]",
+	  "{ A[i,j] -> B[i',j'] : i,j >>= i',j' }" },
 	{ &isl_union_map_lex_gt_at_multi_union_pw_aff,
 	  "{ A[i,j] -> B[i',j'] }",
 	  "F[{ A[i,j] -> [i]; B[i,j] -> [i] }, "
@@ -10018,6 +10092,48 @@ static isl_stat test_multi_pw_aff_3(isl_ctx *ctx)
 	return isl_stat_ok;
 }
 
+/* String descriptions of boxes that
+ * are used for reconstructing box maps from their lower and upper bounds.
+ */
+static const char *multi_pw_aff_box_tests[] = {
+	"{ A[x, y] -> [] : x + y >= 0 }",
+	"[N] -> { A[x, y] -> [x] : x + y <= N }",
+	"[N] -> { A[x, y] -> [x : y] : x + y <= N }",
+};
+
+/* Check that map representations of boxes can be reconstructed
+ * from their lower and upper bounds.
+ */
+static isl_stat test_multi_pw_aff_box(isl_ctx *ctx)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(multi_pw_aff_box_tests); ++i) {
+		const char *str;
+		isl_bool equal;
+		isl_map *map, *box;
+		isl_multi_pw_aff *min, *max;
+
+		str = multi_pw_aff_box_tests[i];
+		map = isl_map_read_from_str(ctx, str);
+		min = isl_map_min_multi_pw_aff(isl_map_copy(map));
+		max = isl_map_max_multi_pw_aff(isl_map_copy(map));
+		box = isl_map_universe(isl_map_get_space(map));
+		box = isl_map_lower_bound_multi_pw_aff(box, min);
+		box = isl_map_upper_bound_multi_pw_aff(box, max);
+		equal = isl_map_is_equal(map, box);
+		isl_map_free(map);
+		isl_map_free(box);
+		if (equal < 0)
+			return isl_stat_error;
+		if (!equal)
+			isl_die(ctx, isl_error_unknown,
+				"unexpected result", return isl_stat_error);
+	}
+
+	return isl_stat_ok;
+}
+
 /* Perform some tests on multi piecewise affine expressions.
  */
 static int test_multi_pw_aff(isl_ctx *ctx)
@@ -10027,6 +10143,8 @@ static int test_multi_pw_aff(isl_ctx *ctx)
 	if (test_multi_pw_aff_2(ctx) < 0)
 		return -1;
 	if (test_multi_pw_aff_3(ctx) < 0)
+		return -1;
+	if (test_multi_pw_aff_box(ctx) < 0)
 		return -1;
 	return 0;
 }
@@ -10572,7 +10690,7 @@ static int test_tile(isl_ctx *ctx)
 }
 
 /* Check that the domain hash of a space is equal to the hash
- * of the domain of the space.
+ * of the domain of the space, both ignoring parameters.
  */
 static int test_domain_hash(isl_ctx *ctx)
 {
@@ -10583,9 +10701,9 @@ static int test_domain_hash(isl_ctx *ctx)
 	map = isl_map_read_from_str(ctx, "[n] -> { A[B[x] -> C[]] -> D[] }");
 	space = isl_map_get_space(map);
 	isl_map_free(map);
-	hash1 = isl_space_get_full_domain_hash(space);
+	hash1 = isl_space_get_tuple_domain_hash(space);
 	space = isl_space_domain(space);
-	hash2 = isl_space_get_full_hash(space);
+	hash2 = isl_space_get_tuple_hash(space);
 	isl_space_free(space);
 
 	if (!space)
@@ -10773,6 +10891,7 @@ struct {
 	{ "intersect", &test_intersect },
 	{ "lexmin", &test_lexmin },
 	{ "min", &test_min },
+	{ "set lower bounds", &test_min_mpa },
 	{ "gist", &test_gist },
 	{ "piecewise quasi-polynomials", &test_pwqp },
 	{ "lift", &test_lift },

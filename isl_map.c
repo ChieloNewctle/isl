@@ -6864,6 +6864,18 @@ __isl_give isl_set *isl_set_upper_bound_val(__isl_take isl_set *set,
 	return set_from_map(isl_map_upper_bound_val(map, type, pos, value));
 }
 
+/* If "mv" has an explicit domain, then intersect the domain of "map"
+ * with this explicit domain.
+ *
+ * An isl_multi_val object never has an explicit domain,
+ * so simply return "map".
+ */
+static __isl_give isl_map *isl_map_intersect_multi_val_explicit_domain(
+	__isl_take isl_map *map, __isl_keep isl_multi_val *mv)
+{
+	return map;
+}
+
 #undef BASE
 #define BASE	val
 #include "isl_map_bound_templ.c"
@@ -6921,15 +6933,6 @@ __isl_give isl_set *isl_set_lower_bound_multi_val(__isl_take isl_set *set,
 	return set_bound_multi_val(set, lower, &map_lower_bound_val);
 }
 
-/* Force the values of the output dimensions of "map"
- * to be no smaller than the corresponding values in "lower".
- */
-__isl_give isl_map *isl_map_lower_bound_multi_val(__isl_take isl_map *map,
-	__isl_take isl_multi_val *lower)
-{
-	return map_bound_multi_val(map, lower, &map_lower_bound_val);
-}
-
 /* Wrapper around isl_map_upper_bound_val for use in map_bound_multi_val,
  * setting a bound on the given output dimension.
  */
@@ -6946,15 +6949,6 @@ __isl_give isl_set *isl_set_upper_bound_multi_val(__isl_take isl_set *set,
 	__isl_take isl_multi_val *upper)
 {
 	return set_bound_multi_val(set, upper, &map_upper_bound_val);
-}
-
-/* Force the values of the set dimensions of "set"
- * to be no greater than the corresponding values in "upper".
- */
-__isl_give isl_map *isl_map_upper_bound_multi_val(__isl_take isl_map *map,
-	__isl_take isl_multi_val *upper)
-{
-	return map_bound_multi_val(map, upper, &map_upper_bound_val);
 }
 
 /* Force the symbolic constant expression "bound"
@@ -8287,6 +8281,11 @@ error:
 	return NULL;
 }
 
+#undef TYPE
+#define TYPE isl_map
+static
+#include "isl_copy_tuple_id_templ.c"
+
 /* Data structure that specifies how isl_map_intersect_factor
  * should operate.
  *
@@ -8322,8 +8321,7 @@ static __isl_give isl_map *isl_map_intersect_factor(
 	__isl_take isl_map *map, __isl_take isl_map *factor,
 	struct isl_intersect_factor_control *control)
 {
-	isl_bool equal, has_id;
-	isl_id *id;
+	isl_bool equal;
 	isl_space *space;
 	isl_map *other, *product;
 
@@ -8336,19 +8334,12 @@ static __isl_give isl_map *isl_map_intersect_factor(
 	}
 
 	space = isl_map_get_space(map);
-	has_id = isl_space_has_tuple_id(space, control->preserve_type);
-	if (has_id < 0)
-		space = isl_space_free(space);
-	else if (has_id)
-		id = isl_space_get_tuple_id(space, control->preserve_type);
-
 	other = isl_map_universe(control->other_factor(space));
 	product = control->product(factor, other);
 
-	if (has_id >= 0 && has_id)
-		product = isl_map_set_tuple_id(product,
-						control->preserve_type, id);
-
+	space = isl_map_peek_space(map);
+	product = isl_map_copy_tuple_id(product, control->preserve_type,
+					space, control->preserve_type);
 	return map_intersect(map, product);
 error:
 	isl_map_free(map);

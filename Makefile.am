@@ -467,6 +467,7 @@ EXTRA_DIST = \
 	check_reparse_test_templ.c \
 	check_single_reference_templ.c \
 	check_type_range_templ.c \
+	isl_copy_tuple_id_templ.c \
 	isl_domain_factor_templ.c \
 	extract_key.c \
 	isl_ilp_opt_multi_val_templ.c \
@@ -569,6 +570,7 @@ EXTRA_DIST = \
 	isl_union_multi.c \
 	isl_union_eval.c \
 	isl_union_locals_templ.c \
+	isl_union_map_lex_templ.c \
 	isl_union_neg.c \
 	isl_union_pw_templ.c \
 	libisl-gdb.py \
