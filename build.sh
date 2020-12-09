@@ -17,5 +17,5 @@ if [ ! -e "$ISL_ROOT/interface/isl.py" ]; then (
     make -j4 interface/isl.py
 ) fi
 
-ln -sf $(realpath $0/interface/isl.py)
-ln -sf $(realpath $0/.libs/libisl.so)
+ln -sf $(realpath $ISL_ROOT/interface/isl.py)
+ln -sf $(realpath $ISL_ROOT/.libs/libisl.so)
