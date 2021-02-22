@@ -1,21 +1,20 @@
 #!/bin/bash
 
 ISL_ROOT="$(dirname "$0")"
-echo "$ISL_ROOT"
 
 if [ ! -e "$ISL_ROOT/.libs/libisl.so" ]; then (
     echo "Build libisl.so"
     cd "$ISL_ROOT"
     autoreconf -i
     ./configure --with-clang=system
-    make -j4
+    make $@
 ) fi
 
 if [ ! -e "$ISL_ROOT/interface/isl.py" ]; then (
     echo "Build isl.py"
     cd "$ISL_ROOT"
-    make -j4 interface/isl.py
+    make $@ interface/isl.py
 ) fi
 
-ln -sf $(realpath $ISL_ROOT/interface/isl.py)
-ln -sf $(realpath $ISL_ROOT/.libs/libisl.so)
+ln -sf $(realpath $ISL_ROOT/interface/isl.py) isl.py
+ln -sf $(realpath $ISL_ROOT/.libs/libisl.so) libisl.so
