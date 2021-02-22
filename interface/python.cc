@@ -218,7 +218,7 @@ void python_generator::print_callback(ParmVarDecl *param, int arg)
 	QualType return_type = fn->getReturnType();
 	unsigned n_arg = fn->getNumArgs();
 
-	printf("        exc_info = [None]\n");
+	printf("        exc_info = None\n");
 	printf("        fn = CFUNCTYPE(");
 	if (is_isl_stat(return_type) || is_isl_bool(return_type))
 		printf("c_int");
@@ -257,9 +257,9 @@ void python_generator::print_callback(ParmVarDecl *param, int arg)
 		printf("cb_arg%d", i);
 	}
 	printf(")\n");
-	printf("            except:\n");
-	printf("                import sys\n");
-	printf("                exc_info[0] = sys.exc_info()\n");
+	printf("            except BaseException as e:\n");
+	printf("                nonlocal exc_info\n");
+	printf("                exc_info = e\n");
 	if (is_isl_stat(return_type) || is_isl_bool(return_type))
 		printf("                return -1\n");
 	else
@@ -325,9 +325,8 @@ void python_generator::print_arg_in_call(FunctionDecl *fd, const char *fmt,
  */
 static void print_rethrow(int indent, const char *exc_info)
 {
-	print_indent(indent, "if %s != None:\n", exc_info);
-	print_indent(indent, "    raise (%s[0], %s[1], %s[2])\n",
-		exc_info, exc_info, exc_info);
+	print_indent(indent, "if %s is not None:\n", exc_info);
+	print_indent(indent, "    raise %s\n", exc_info);
 }
 
 /* Print code with the given indentation that checks
@@ -350,13 +349,13 @@ static void print_persistent_callback_failure_check(int indent,
 		printf(fmt, 0);
 		printf(", '%s') and ", callback_name.c_str());
 		printf(fmt, 0);
-		printf(".%s['exc_info'] != None:\n", callback_name.c_str());
+		printf(".%s['exc_info'] is not None:\n", callback_name.c_str());
 		print_indent(indent, "    exc_info = ");
 		printf(fmt, 0);
-		printf(".%s['exc_info'][0]\n", callback_name.c_str());
+		printf(".%s['exc_info']\n", callback_name.c_str());
 		print_indent(indent, "    ");
 		printf(fmt, 0);
-		printf(".%s['exc_info'][0] = None\n", callback_name.c_str());
+		printf(".%s['exc_info'] = None\n", callback_name.c_str());
 		print_rethrow(indent + 4, "exc_info");
 	}
 }
@@ -402,7 +401,7 @@ void python_generator::print_method_return(int indent, const isl_class &clazz,
 		print_indent(indent,
 			"obj = %s(ctx=ctx, ptr=res)\n", type.c_str());
 		if (is_mutator(clazz, method) &&
-		    clazz.has_persistent_callbacks())
+				clazz.has_persistent_callbacks())
 			print_indent(indent, "obj.copy_callbacks(arg0)\n");
 		if (clazz.persistent_callbacks.count(method)) {
 			string callback_name;
@@ -417,7 +416,7 @@ void python_generator::print_method_return(int indent, const isl_class &clazz,
 		print_indent(indent, "if res == 0:\n");
 		print_indent(indent, "    raise\n");
 		print_indent(indent, "string = "
-		       "cast(res, c_char_p).value.decode('ascii')\n");
+			"cast(res, c_char_p).value.decode('ascii')\n");
 
 		if (gives(method))
 			print_indent(indent, "libc.free(res)\n");
@@ -491,7 +490,7 @@ void python_generator::print_method_call(int indent, const isl_class &clazz,
 	printf(")\n");
 
 	if (drop_user)
-		print_rethrow(indent, "exc_info[0]");
+		print_rethrow(indent, "exc_info");
 
 	print_method_return(indent, clazz, method, fmt);
 }
@@ -536,10 +535,10 @@ void python_generator::print_method(const isl_class &clazz,
 	}
 
 	print_method_header(is_static(clazz, method), cname,
-			    num_params - drop_ctx - drop_user);
+			num_params - drop_ctx - drop_user);
 
 	print_type_checks(cname, method, drop_ctx,
-			    num_params - drop_user, super);
+			num_params - drop_user, super);
 	for (int i = 1; i < num_params; ++i) {
 		ParmVarDecl *param = method->getParamDecl(i);
 		QualType type = param->getOriginalType();
@@ -754,6 +753,7 @@ void python_generator::print_constructor(const isl_class &clazz,
 		print_arg_in_call(cons, var_arg_fmt, i, drop_ctx);
 	}
 	printf(")\n");
+	printf("            assert self.ptr\n");
 	printf("            return\n");
 }
 
@@ -769,7 +769,7 @@ void python_generator::print_upcast_constructors(const isl_class &clazz)
 		return;
 
 	for (i = clazz.type_subclasses.begin();
-	     i != clazz.type_subclasses.end(); ++i) {
+			i != clazz.type_subclasses.end(); ++i) {
 		printf("        if len(args) == 1 and "
 						"isinstance(args[0], %s):\n",
 			 type2python(i->second).c_str());
@@ -888,7 +888,7 @@ void python_generator::print_new(const isl_class &clazz,
 			clazz.fn_type->getNameAsString().c_str());
 
 		for (i = clazz.type_subclasses.begin();
-		     i != clazz.type_subclasses.end(); ++i) {
+				i != clazz.type_subclasses.end(); ++i) {
 			printf("            if type == %d:\n", i->first);
 			printf("                return %s(**keywords)\n",
 				type2python(i->second).c_str());
