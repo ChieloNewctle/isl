@@ -159,6 +159,14 @@ __isl_give isl_aff *isl_aff_zero_on_domain_space(__isl_take isl_space *space)
 	return isl_aff_zero_on_domain(isl_local_space_from_space(space));
 }
 
+/* This function performs the same operation as isl_aff_zero_on_domain_space,
+ * but is considered as a function on an isl_space when exported.
+ */
+__isl_give isl_aff *isl_space_zero_aff_on_domain(__isl_take isl_space *space)
+{
+	return isl_aff_zero_on_domain_space(space);
+}
+
 /* Return a piecewise affine expression defined on the specified domain
  * that is equal to zero.
  */
@@ -4063,6 +4071,15 @@ error:
 	return NULL;
 }
 
+/* This function performs the same operation as isl_multi_aff_domain_map,
+ * but is considered as a function on an isl_space when exported.
+ */
+__isl_give isl_multi_aff *isl_space_domain_map_multi_aff(
+	__isl_take isl_space *space)
+{
+	return isl_multi_aff_domain_map(space);
+}
+
 /* Given a map space, return an isl_multi_aff that maps a wrapped copy
  * of the space to its range.
  */
@@ -4107,6 +4124,15 @@ error:
 	return NULL;
 }
 
+/* This function performs the same operation as isl_multi_aff_range_map,
+ * but is considered as a function on an isl_space when exported.
+ */
+__isl_give isl_multi_aff *isl_space_range_map_multi_aff(
+	__isl_take isl_space *space)
+{
+	return isl_multi_aff_range_map(space);
+}
+
 /* Given a map space, return an isl_pw_multi_aff that maps a wrapped copy
  * of the space to its domain.
  */
@@ -4116,6 +4142,15 @@ __isl_give isl_pw_multi_aff *isl_pw_multi_aff_domain_map(
 	return isl_pw_multi_aff_from_multi_aff(isl_multi_aff_domain_map(space));
 }
 
+/* This function performs the same operation as isl_pw_multi_aff_domain_map,
+ * but is considered as a function on an isl_space when exported.
+ */
+__isl_give isl_pw_multi_aff *isl_space_domain_map_pw_multi_aff(
+	__isl_take isl_space *space)
+{
+	return isl_pw_multi_aff_domain_map(space);
+}
+
 /* Given a map space, return an isl_pw_multi_aff that maps a wrapped copy
  * of the space to its range.
  */
@@ -4123,6 +4158,15 @@ __isl_give isl_pw_multi_aff *isl_pw_multi_aff_range_map(
 	__isl_take isl_space *space)
 {
 	return isl_pw_multi_aff_from_multi_aff(isl_multi_aff_range_map(space));
+}
+
+/* This function performs the same operation as isl_pw_multi_aff_range_map,
+ * but is considered as a function on an isl_space when exported.
+ */
+__isl_give isl_pw_multi_aff *isl_space_range_map_pw_multi_aff(
+	__isl_take isl_space *space)
+{
+	return isl_pw_multi_aff_range_map(space);
 }
 
 /* Given the space of a set and a range of set dimensions,
@@ -4198,6 +4242,15 @@ __isl_give isl_pw_multi_aff *isl_pw_multi_aff_project_out_map(
 	return isl_pw_multi_aff_from_multi_aff(ma);
 }
 
+/* This function performs the same operation as isl_pw_multi_aff_from_multi_aff,
+ * but is considered as a function on an isl_multi_aff when exported.
+ */
+__isl_give isl_pw_multi_aff *isl_multi_aff_to_pw_multi_aff(
+	__isl_take isl_multi_aff *ma)
+{
+	return isl_pw_multi_aff_from_multi_aff(ma);
+}
+
 /* Create a piecewise multi-affine expression in the given space that maps each
  * input dimension to the corresponding output dimension.
  */
@@ -4217,6 +4270,16 @@ __isl_give isl_pw_multi_aff *isl_pw_multi_aff_identity_on_domain_space(
 
 	ma = isl_multi_aff_identity_on_domain_space(space);
 	return isl_pw_multi_aff_from_multi_aff(ma);
+}
+
+/* This function performs the same operation as
+ * isl_pw_multi_aff_identity_on_domain_space,
+ * but is considered as a function on an isl_space when exported.
+ */
+__isl_give isl_pw_multi_aff *isl_space_identity_pw_multi_aff_on_domain(
+	__isl_take isl_space *space)
+{
+	return isl_pw_multi_aff_identity_on_domain_space(space);
 }
 
 /* Exploit the equalities in "eq" to simplify the affine expressions.
@@ -4444,6 +4507,7 @@ __isl_give isl_set *isl_multi_aff_lex_gt_set(__isl_take isl_multi_aff *ma1,
 #include <isl_pw_move_dims_templ.c>
 #include <isl_pw_neg_templ.c>
 #include <isl_pw_pullback_templ.c>
+#include <isl_pw_range_tuple_id_templ.c>
 #include <isl_pw_union_opt.c>
 
 #undef BASE
@@ -5459,9 +5523,25 @@ error:
 	return NULL;
 }
 
+/* This function performs the same operation as isl_pw_multi_aff_from_map,
+ * but is considered as a function on an isl_map when exported.
+ */
+__isl_give isl_pw_multi_aff *isl_map_as_pw_multi_aff(__isl_take isl_map *map)
+{
+	return isl_pw_multi_aff_from_map(map);
+}
+
 __isl_give isl_pw_multi_aff *isl_pw_multi_aff_from_set(__isl_take isl_set *set)
 {
 	return isl_pw_multi_aff_from_map(set);
+}
+
+/* This function performs the same operation as isl_pw_multi_aff_from_set,
+ * but is considered as a function on an isl_set when exported.
+ */
+__isl_give isl_pw_multi_aff *isl_set_as_pw_multi_aff(__isl_take isl_set *set)
+{
+	return isl_pw_multi_aff_from_set(set);
 }
 
 /* Convert "map" into an isl_pw_multi_aff (if possible) and
@@ -5510,6 +5590,16 @@ __isl_give isl_union_pw_multi_aff *isl_union_pw_multi_aff_from_union_map(
 	isl_union_map_free(umap);
 
 	return upma;
+}
+
+/* This function performs the same operation as
+ * isl_union_pw_multi_aff_from_union_map,
+ * but is considered as a function on an isl_union_map when exported.
+ */
+__isl_give isl_union_pw_multi_aff *isl_union_map_as_union_pw_multi_aff(
+	__isl_take isl_union_map *umap)
+{
+	return isl_union_pw_multi_aff_from_union_map(umap);
 }
 
 /* Try and create an isl_union_pw_multi_aff that is equivalent
@@ -6076,7 +6166,7 @@ static
 
 /* Extract an isl_pw_aff corresponding to output dimension "pos" of "pma".
  */
-__isl_give isl_pw_aff *isl_pw_multi_aff_get_pw_aff(
+__isl_give isl_pw_aff *isl_pw_multi_aff_get_at(
 	__isl_keep isl_pw_multi_aff *pma, int pos)
 {
 	int i;
@@ -6104,6 +6194,14 @@ __isl_give isl_pw_aff *isl_pw_multi_aff_get_pw_aff(
 	}
 
 	return pa;
+}
+
+/* This is an alternative name for the function above.
+ */
+__isl_give isl_pw_aff *isl_pw_multi_aff_get_pw_aff(
+	__isl_keep isl_pw_multi_aff *pma, int pos)
+{
+	return isl_pw_multi_aff_get_at(pma, pos);
 }
 
 /* Return an isl_pw_multi_aff with the given "set" as domain and
@@ -6809,6 +6907,15 @@ __isl_give isl_multi_pw_aff *isl_multi_pw_aff_from_multi_aff(
 	return mpa;
 }
 
+/* This function performs the same operation as isl_multi_pw_aff_from_multi_aff,
+ * but is considered as a function on an isl_multi_aff when exported.
+ */
+__isl_give isl_multi_pw_aff *isl_multi_aff_to_multi_pw_aff(
+	__isl_take isl_multi_aff *ma)
+{
+	return isl_multi_pw_aff_from_multi_aff(ma);
+}
+
 /* Construct and return a multi piecewise affine expression
  * that is equal to the given piecewise multi affine expression.
  *
@@ -6845,6 +6952,16 @@ __isl_give isl_multi_pw_aff *isl_multi_pw_aff_from_pw_multi_aff(
 
 	isl_pw_multi_aff_free(pma);
 	return mpa;
+}
+
+/* This function performs the same operation as
+ * isl_multi_pw_aff_from_pw_multi_aff,
+ * but is considered as a function on an isl_pw_multi_aff when exported.
+ */
+__isl_give isl_multi_pw_aff *isl_pw_multi_aff_to_multi_pw_aff(
+	__isl_take isl_pw_multi_aff *pma)
+{
+	return isl_multi_pw_aff_from_pw_multi_aff(pma);
 }
 
 /* Do "pa1" and "pa2" represent the same function?
@@ -7649,7 +7766,7 @@ __isl_give isl_pw_aff *isl_pw_aff_param_on_domain_id(
 /* Return a multi affine expression that is equal to "mv" on domain
  * space "space".
  */
-__isl_give isl_multi_aff *isl_multi_aff_multi_val_on_space(
+__isl_give isl_multi_aff *isl_multi_aff_multi_val_on_domain_space(
 	__isl_take isl_space *space, __isl_take isl_multi_val *mv)
 {
 	int i;
@@ -7686,6 +7803,24 @@ error:
 	return NULL;
 }
 
+/* This is an alternative name for the function above.
+ */
+__isl_give isl_multi_aff *isl_multi_aff_multi_val_on_space(
+	__isl_take isl_space *space, __isl_take isl_multi_val *mv)
+{
+	return isl_multi_aff_multi_val_on_domain_space(space, mv);
+}
+
+/* This function performs the same operation as
+ * isl_multi_aff_multi_val_on_domain_space,
+ * but is considered as a function on an isl_space when exported.
+ */
+__isl_give isl_multi_aff *isl_space_multi_aff_on_domain_multi_val(
+	__isl_take isl_space *space, __isl_take isl_multi_val *mv)
+{
+	return isl_multi_aff_multi_val_on_domain_space(space, mv);
+}
+
 /* Return a piecewise multi-affine expression
  * that is equal to "mv" on "domain".
  */
@@ -7699,6 +7834,16 @@ __isl_give isl_pw_multi_aff *isl_pw_multi_aff_multi_val_on_domain(
 	ma = isl_multi_aff_multi_val_on_space(space, mv);
 
 	return isl_pw_multi_aff_alloc(domain, ma);
+}
+
+/* This function performs the same operation as
+ * isl_pw_multi_aff_multi_val_on_domain,
+ * but is considered as a function on an isl_set when exported.
+ */
+__isl_give isl_pw_multi_aff *isl_set_pw_multi_aff_on_domain_multi_val(
+	__isl_take isl_set *domain, __isl_take isl_multi_val *mv)
+{
+	return isl_pw_multi_aff_multi_val_on_domain(domain, mv);
 }
 
 /* Internal data structure for isl_union_pw_multi_aff_multi_val_on_domain.
@@ -8510,6 +8655,7 @@ error:
 #include <isl_multi_nan_templ.c>
 #include <isl_multi_tuple_id_templ.c>
 #include <isl_multi_union_add_templ.c>
+#include <isl_multi_zero_space_templ.c>
 
 /* Does "mupa" have a non-trivial explicit domain?
  *
@@ -8583,6 +8729,16 @@ __isl_give isl_multi_union_pw_aff *isl_multi_union_pw_aff_from_multi_aff(
 
 	mpa = isl_multi_pw_aff_from_multi_aff(ma);
 	return isl_multi_union_pw_aff_from_multi_pw_aff(mpa);
+}
+
+/* This function performs the same operation as
+ * isl_multi_union_pw_aff_from_multi_aff, but is considered as a function on an
+ * isl_multi_aff when exported.
+ */
+__isl_give isl_multi_union_pw_aff *isl_multi_aff_to_multi_union_pw_aff(
+        __isl_take isl_multi_aff *ma)
+{
+        return isl_multi_union_pw_aff_from_multi_aff(ma);
 }
 
 /* Construct and return a multi union piecewise affine expression
@@ -8712,6 +8868,17 @@ error:
 	return NULL;
 }
 
+/* This function performs the same operation as
+ * isl_multi_union_pw_aff_from_union_pw_multi_aff,
+ * but is considered as a function on an isl_union_pw_multi_aff when exported.
+ */
+__isl_give isl_multi_union_pw_aff *
+isl_union_pw_multi_aff_as_multi_union_pw_aff(
+	__isl_take isl_union_pw_multi_aff *upma)
+{
+	return isl_multi_union_pw_aff_from_union_pw_multi_aff(upma);
+}
+
 /* Try and create an isl_multi_union_pw_aff that is equivalent
  * to the given isl_union_map.
  * The isl_union_map is required to be single-valued in each space.
@@ -8725,6 +8892,16 @@ __isl_give isl_multi_union_pw_aff *isl_multi_union_pw_aff_from_union_map(
 
 	upma = isl_union_pw_multi_aff_from_union_map(umap);
 	return isl_multi_union_pw_aff_from_union_pw_multi_aff(upma);
+}
+
+/* This function performs the same operation as
+ * isl_multi_union_pw_aff_from_union_map,
+ * but is considered as a function on an isl_union_map when exported.
+ */
+__isl_give isl_multi_union_pw_aff *isl_union_map_as_multi_union_pw_aff(
+	__isl_take isl_union_map *umap)
+{
+	return isl_multi_union_pw_aff_from_union_map(umap);
 }
 
 /* Return a multiple union piecewise affine expression

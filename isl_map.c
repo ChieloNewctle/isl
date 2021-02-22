@@ -742,6 +742,22 @@ __isl_give isl_map *isl_map_set_tuple_id(__isl_take isl_map *map,
 	return isl_map_reset_space(map, isl_map_get_space(map));
 }
 
+/* Replace the identifier of the domain tuple of "map" by "id".
+ */
+__isl_give isl_map *isl_map_set_domain_tuple_id(__isl_take isl_map *map,
+	__isl_take isl_id *id)
+{
+	return isl_map_set_tuple_id(map, isl_dim_in, id);
+}
+
+/* Replace the identifier of the range tuple of "map" by "id".
+ */
+__isl_give isl_map *isl_map_set_range_tuple_id(__isl_take isl_map *map,
+	__isl_take isl_id *id)
+{
+	return isl_map_set_tuple_id(map, isl_dim_out, id);
+}
+
 __isl_give isl_set *isl_set_set_tuple_id(__isl_take isl_set *set,
 	__isl_take isl_id *id)
 {
@@ -770,10 +786,38 @@ isl_bool isl_map_has_tuple_id(__isl_keep isl_map *map, enum isl_dim_type type)
 	return map ? isl_space_has_tuple_id(map->dim, type) : isl_bool_error;
 }
 
+/* Does the domain tuple of "map" have an identifier?
+ */
+isl_bool isl_map_has_domain_tuple_id(__isl_keep isl_map *map)
+{
+	return isl_map_has_tuple_id(map, isl_dim_in);
+}
+
+/* Does the range tuple of "map" have an identifier?
+ */
+isl_bool isl_map_has_range_tuple_id(__isl_keep isl_map *map)
+{
+	return isl_map_has_tuple_id(map, isl_dim_out);
+}
+
 __isl_give isl_id *isl_map_get_tuple_id(__isl_keep isl_map *map,
 	enum isl_dim_type type)
 {
 	return map ? isl_space_get_tuple_id(map->dim, type) : NULL;
+}
+
+/* Return the identifier of the domain tuple of "map", assuming it has one.
+ */
+__isl_give isl_id *isl_map_get_domain_tuple_id(__isl_keep isl_map *map)
+{
+	return isl_map_get_tuple_id(map, isl_dim_in);
+}
+
+/* Return the identifier of the range tuple of "map", assuming it has one.
+ */
+__isl_give isl_id *isl_map_get_range_tuple_id(__isl_keep isl_map *map)
+{
+	return isl_map_get_tuple_id(map, isl_dim_out);
 }
 
 isl_bool isl_set_has_tuple_id(__isl_keep isl_set *set)
@@ -3421,6 +3465,14 @@ __isl_give isl_set *isl_set_grow(__isl_take isl_set *set, int n)
 __isl_give isl_set *isl_set_from_basic_set(__isl_take isl_basic_set *bset)
 {
 	return isl_map_from_basic_map(bset);
+}
+
+/* This function performs the same operation as isl_set_from_basic_set,
+ * but is considered as a function on an isl_basic_set when exported.
+ */
+__isl_give isl_set *isl_basic_set_to_set(__isl_take isl_basic_set *bset)
+{
+	return isl_set_from_basic_set(bset);
 }
 
 __isl_give isl_map *isl_map_from_basic_map(__isl_take isl_basic_map *bmap)
@@ -6277,6 +6329,14 @@ __isl_give isl_map *isl_map_universe(__isl_take isl_space *space)
 	return map;
 }
 
+/* This function performs the same operation as isl_map_universe,
+ * but is considered as a function on an isl_space when exported.
+ */
+__isl_give isl_map *isl_space_universe_map(__isl_take isl_space *space)
+{
+	return isl_map_universe(space);
+}
+
 __isl_give isl_set *isl_set_universe(__isl_take isl_space *space)
 {
 	struct isl_set *set;
@@ -6285,6 +6345,14 @@ __isl_give isl_set *isl_set_universe(__isl_take isl_space *space)
 	set = isl_set_alloc_space(isl_space_copy(space), 1, ISL_MAP_DISJOINT);
 	set = isl_set_add_basic_set(set, isl_basic_set_universe(space));
 	return set;
+}
+
+/* This function performs the same operation as isl_set_universe,
+ * but is considered as a function on an isl_space when exported.
+ */
+__isl_give isl_set *isl_space_universe_set(__isl_take isl_space *space)
+{
+	return isl_set_universe(space);
 }
 
 __isl_give isl_map *isl_map_dup(__isl_keep isl_map *map)
@@ -9512,6 +9580,16 @@ static int find_div(__isl_keep isl_basic_map *dst,
 /* Align the divs of "dst" to those of "src", adding divs from "src"
  * if needed.  That is, make sure that the first src->n_div divs
  * of the result are equal to those of src.
+ * The integer division of "src" are assumed to be ordered.
+ *
+ * The integer divisions are swapped into the right position
+ * (possibly after adding them first).  This may result
+ * in the remaining integer divisions appearing in the wrong order,
+ * i.e., with some integer division appearing before
+ * some other integer division on which it depends.
+ * The integer divisions therefore need to be ordered.
+ * This will not affect the integer divisions aligned to those of "src",
+ * since "src" is assumed to have ordered integer divisions.
  *
  * The result is not finalized as by design it will have redundant
  * divs if any divs from "src" were copied.
@@ -9543,10 +9621,6 @@ __isl_give isl_basic_map *isl_basic_map_align_divs(
 	if (v_div < 0)
 		return isl_basic_map_free(dst);
 
-	src = isl_basic_map_order_divs(isl_basic_map_copy(src));
-	if (!src)
-		return isl_basic_map_free(dst);
-
 	extended = 0;
 	dst_n_div = isl_basic_map_dim(dst, isl_dim_div);
 	if (dst_n_div < 0)
@@ -9560,32 +9634,27 @@ __isl_give isl_basic_map *isl_basic_map_align_divs(
 				int extra = src->n_div - i;
 				dst = isl_basic_map_cow(dst);
 				if (!dst)
-					goto error;
+					return isl_basic_map_free(dst);
 				dst = isl_basic_map_extend(dst,
 						extra, 0, 2 * extra);
 				extended = 1;
 			}
 			j = isl_basic_map_alloc_div(dst);
 			if (j < 0)
-				goto error;
+				return isl_basic_map_free(dst);
 			isl_seq_cpy(dst->div[j], src->div[i], 1+1+v_div+i);
 			isl_seq_clr(dst->div[j]+1+1+v_div+i, dst->n_div - i);
 			dst_n_div++;
 			dst = isl_basic_map_add_div_constraints(dst, j);
 			if (!dst)
-				goto error;
+				return isl_basic_map_free(dst);
 		}
 		if (j != i)
 			dst = isl_basic_map_swap_div(dst, i, j);
 		if (!dst)
-			goto error;
+			return isl_basic_map_free(dst);
 	}
-	isl_basic_map_free(src);
-	return dst;
-error:
-	isl_basic_map_free(src);
-	isl_basic_map_free(dst);
-	return NULL;
+	return isl_basic_map_order_divs(dst);
 }
 
 __isl_give isl_map *isl_map_align_divs_internal(__isl_take isl_map *map)
@@ -9597,6 +9666,7 @@ __isl_give isl_map *isl_map_align_divs_internal(__isl_take isl_map *map)
 	if (map->n == 0)
 		return map;
 	map = isl_map_compute_divs(map);
+	map = isl_map_order_divs(map);
 	map = isl_map_cow(map);
 	if (!map)
 		return NULL;
@@ -9645,6 +9715,7 @@ __isl_give isl_map *isl_map_align_divs_to_basic_map_list(
 		isl_basic_map *bmap;
 
 		bmap = isl_basic_map_list_get_basic_map(list, i);
+		bmap = isl_basic_map_order_divs(bmap);
 		map->p[0] = isl_basic_map_align_divs(map->p[0], bmap);
 		isl_basic_map_free(bmap);
 	}

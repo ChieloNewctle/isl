@@ -141,6 +141,7 @@ libisl_la_SOURCES = \
 	isl_ilp_private.h \
 	isl_input.c \
 	isl_int.h \
+	isl_list_private.h \
 	isl_local_private.h \
 	isl_local.h \
 	isl_local.c \
@@ -331,20 +332,18 @@ interface/isl.py: interface/extract_interface$(BUILD_EXEEXT) libdep.a \
 			> $@ || (rm $@ && false)
 
 include/isl/cpp.h: interface/extract_interface$(BUILD_EXEEXT) libdep.a \
-		cpp/cpp.h.top cpp/cpp.h.pre cpp/cpp.h.bot
-	$(MKDIR_P) "include/isl/cpp" && \
-	(cat $(srcdir)/cpp/cpp.h.top $(srcdir)/all.h \
-	    $(srcdir)/cpp/cpp.h.pre && \
+		cpp/cpp.h.top cpp/cpp.h.bot
+	$(MKDIR_P) "include/isl" && \
+	(cat $(srcdir)/cpp/cpp.h.top $(srcdir)/all.h && \
 		interface/extract_interface$(BUILD_EXEEXT) --language=cpp \
 			$(includes) $(srcdir)/all.h && \
 		cat $(srcdir)/cpp/cpp.h.bot) \
 			> $@ || (rm $@ && false)
 
 include/isl/cpp-checked.h: interface/extract_interface$(BUILD_EXEEXT) libdep.a \
-		cpp/cpp-checked.h.top \
-		cpp/cpp-checked.h.pre cpp/cpp-checked.h.bot
-	(cat $(srcdir)/cpp/cpp-checked.h.top $(srcdir)/all.h \
-	    $(srcdir)/cpp/cpp-checked.h.pre && \
+		cpp/cpp-checked.h.top cpp/cpp-checked.h.bot
+	$(MKDIR_P) "include/isl" && \
+	(cat $(srcdir)/cpp/cpp-checked.h.top $(srcdir)/all.h && \
 		interface/extract_interface$(BUILD_EXEEXT) \
 			--language=cpp-checked \
 			$(includes) $(srcdir)/all.h && \
@@ -356,6 +355,7 @@ include/isl/cpp-checked-conversion.h: \
 		libdep.a \
 		cpp/cpp-checked-conversion.h.top \
 		cpp/cpp-checked-conversion.h.bot
+	$(MKDIR_P) "include/isl" && \
 	(cat $(srcdir)/cpp/cpp-checked-conversion.h.top && \
 		interface/extract_interface$(BUILD_EXEEXT) \
 			--language=cpp-checked-conversion \
@@ -523,6 +523,7 @@ EXTRA_DIST = \
 	isl_multi_unbind_params_templ.c \
 	isl_multi_union_add_templ.c \
 	isl_multi_zero_templ.c \
+	isl_multi_zero_space_templ.c \
 	isl_opt_mpa_templ.c \
 	opt_type.h \
 	print_templ.c \
@@ -548,6 +549,7 @@ EXTRA_DIST = \
 	isl_pw_neg_templ.c \
 	isl_pw_opt_templ.c \
 	isl_pw_pullback_templ.c \
+	isl_pw_range_tuple_id_templ.c \
 	isl_pw_sub_templ.c \
 	isl_pw_union_opt.c \
 	read_in_string_templ.c \
