@@ -101,7 +101,236 @@ static std::string to_string(long l)
 	return strm.str();
 }
 
+/* Determine the isl types from which the given class can be implicitly
+ * constructed using a unary constructor.
+ *
+ * Look through all constructors for implicit conversion constructors that take
+ * an isl type and add those types, along with the corresponding
+ * constructor argument.
+ */
+void cpp_generator::set_class_construction_types(isl_class &clazz)
+{
+	for (const auto &cons : clazz.constructors) {
+		ParmVarDecl *param;
+		QualType type;
+		std::string arg_type;
+
+		if (!is_implicit_conversion(Method(clazz, cons)))
+			continue;
+
+		param = cons->getParamDecl(0);
+		type = param->getOriginalType();
+		arg_type = extract_type(type);
+		clazz.construction_types.emplace(arg_type, param);
+	}
+}
+
+/* Determine the isl types from which any (proper) class can be constructed
+ * using a unary constructor.
+ */
+void cpp_generator::set_construction_types()
+{
+	for (auto &kvp : classes) {
+		auto &clazz = kvp.second;
+		set_class_construction_types(clazz);
+	}
+}
+
+/* Construct a generator for C++ bindings.
+ *
+ * "checked" is set if C++ bindings should be generated
+ * that rely on the user to check for error conditions.
+ *
+ * The classes and methods are extracted by the constructor
+ * of the generator superclass.
+ * Additionally extract information about types
+ * that can be converted to a class.
+ */
+cpp_generator::cpp_generator(SourceManager &SM,
+	set<RecordDecl *> &exported_types,
+	set<FunctionDecl *> exported_functions, set<FunctionDecl *> functions,
+	bool checked) :
+		generator(SM, exported_types, exported_functions, functions),
+		checked(checked)
+{
+	set_construction_types();
+}
+
+/* Copy the method called "name" described by "fd" from "super" to "clazz"
+ * with the distance to the original ancestor given by "depth".
+ *
+ * In particular, keep track of "fd" as well as the superclass
+ * from which it was copied and the distance to the original ancestor.
+ */
+static void copy_method(isl_class &clazz, const isl_class &super,
+	const std::string &name, FunctionDecl *fd, int depth)
+{
+	clazz.methods[name].insert(fd);
+	clazz.copied_from.emplace(fd, super);
+	clazz.copy_depth.emplace(fd, depth);
+}
+
+/* Do "fd1" and "fd2" have the same signature (ignoring the first argument
+ * which represents the object class on which the corresponding method
+ * gets called).
+ */
+static bool same_signature(FunctionDecl *fd1, FunctionDecl *fd2)
+{
+	int n1 = fd1->getNumParams();
+	int n2 = fd2->getNumParams();
+
+	if (n1 != n2)
+		return false;
+
+	for (int i = 1; i < n1; ++i) {
+		ParmVarDecl *p1 = fd1->getParamDecl(i);
+		ParmVarDecl *p2 = fd2->getParamDecl(i);
+
+		if (p1->getOriginalType() != p2->getOriginalType())
+			return false;
+	}
+
+	return true;
+}
+
+/* Return the distance between "clazz" and the ancestor
+ * from which "fd" got copied.
+ * If no distance was recorded, then the method has not been copied
+ * but appears in "clazz" itself and so the distance is zero.
+ */
+static int copy_depth(const isl_class &clazz, FunctionDecl *fd)
+{
+	if (clazz.copy_depth.count(fd) == 0)
+		return 0;
+	return clazz.copy_depth.at(fd);
+}
+
+/* Is the method derived from "fd", with method name "name" and
+ * with distance to the original ancestor "depth",
+ * overridden by a method already in "clazz"?
+ *
+ * A method is considered to have been overridden if there
+ * is a method with the same name in "clazz" that has the same signature and
+ * that comes from an ancestor closer to "clazz",
+ * where an ancestor is closer if the distance in the class hierarchy
+ * is smaller or the distance is the same and the ancestor appears
+ * closer in the declaration of the type (in which case it gets added first).
+ *
+ * If a method with the same signature has already been added,
+ * but it does not override the method derived from "fd",
+ * then this method is removed since it is overridden by "fd".
+ */
+static bool is_overridden(FunctionDecl *fd, isl_class &clazz,
+	const std::string &name, int depth)
+{
+	if (clazz.methods.count(name) == 0)
+		return false;
+
+	for (const auto &m : clazz.methods.at(name)) {
+		if (!same_signature(fd, m))
+			continue;
+		if (copy_depth(clazz, m) <= depth)
+			return true;
+		clazz.methods[name].erase(m);
+		return false;
+	}
+	return false;
+}
+
+/* Add the methods "methods" with method name "name" from "super" to "clazz"
+ * provided they have not been overridden by a method already in "clazz".
+ *
+ * Methods that are static in their original class are not copied.
+ */
+void cpp_generator::copy_methods(isl_class &clazz, const std::string &name,
+	const isl_class &super, const function_set &methods)
+{
+	for (auto fd : methods) {
+		int depth;
+
+		if (method2class(fd)->is_static(fd))
+			continue;
+		depth = copy_depth(super, fd) + 1;
+		if (is_overridden(fd, clazz, name, depth))
+			continue;
+		copy_method(clazz, super, name, fd, depth);
+	}
+}
+
+/* Add all methods from "super" to "clazz" that have not been overridden
+ * by a method already in "clazz".
+ *
+ * Look through all groups of methods with the same name.
+ */
+void cpp_generator::copy_super_methods(isl_class &clazz, const isl_class &super)
+{
+	for (const auto &kvp : super.methods) {
+		const auto &name = kvp.first;
+		const auto &methods = kvp.second;
+
+		copy_methods(clazz, name, super, methods);
+	}
+}
+
+/* Copy methods from the superclasses of "clazz"
+ * if an object of this class can be implicitly converted to an object
+ * from the superclass, keeping track
+ * of the classes that have already been handled in "done".
+ *
+ * Make sure the superclasses have copied methods from their superclasses first
+ * since those methods could be copied further down to this class.
+ *
+ * Consider the superclass that appears closest to the subclass first.
+ */
+void cpp_generator::copy_super_methods(isl_class &clazz, set<string> &done)
+{
+	auto supers = find_superclasses(clazz.type);
+
+	for (const auto &super : supers)
+		if (done.count(super) == 0)
+			copy_super_methods(classes[super], done);
+	done.insert(clazz.name);
+
+	for (const auto &super_name : supers) {
+		const auto &super = classes[super_name];
+
+		if (super.construction_types.count(clazz.name) == 0)
+			continue;
+		copy_super_methods(clazz, super);
+	}
+}
+
+/* For each (proper) class, copy methods from its superclasses,
+ * if an object from the class can be converted to an object
+ * from the superclass.
+ *
+ * Type based subclasses are not considered for now since
+ * they do not have any explicit superclasses.
+ *
+ * Iterate through all (proper) classes and copy methods
+ * from their superclasses,
+ * unless they have already been determined by a recursive call.
+ */
+void cpp_generator::copy_super_methods()
+{
+	set<string> done;
+
+	for (auto &kvp : classes) {
+		auto &clazz = kvp.second;
+
+		if (clazz.is_type_subclass())
+			continue;
+		if (done.count(clazz.name) != 0)
+			continue;
+		copy_super_methods(clazz, done);
+	}
+}
+
 /* Generate a cpp interface based on the extracted types and functions.
+ *
+ * Before any printing is performed, first copy all methods
+ * from superclasses that can be converted to a given class
+ * to that class.
  *
  * Print first a set of forward declarations for all isl wrapper
  * classes, then the declarations of the classes, and at the end all
@@ -119,6 +348,8 @@ void cpp_generator::generate()
 	osprintf(os, "namespace isl {\n\n");
 	if (checked)
 		osprintf(os, "namespace checked {\n\n");
+
+	copy_super_methods();
 
 	print_forward_declarations(os);
 	osprintf(os, "\n");
@@ -349,29 +580,17 @@ void cpp_generator::decl_printer::print_public_constructors()
 }
 
 /* Print declarations for "method".
- *
- * "kind" specifies the kind of method that should be generated.
- *
- * "convert" specifies which of the method arguments should
- * be automatically converted.
  */
-void cpp_generator::decl_printer::print_method(FunctionDecl *method,
-	function_kind kind, const std::vector<bool> &convert)
+void cpp_generator::decl_printer::print_method(const ConversionMethod &method)
 {
-	string name = clazz.method_name(method);
-
-	print_named_method(method, name, kind, convert);
+	print_method_header(method);
 }
 
-/* Print declarations for "method",
- * without any argument conversions.
- *
- * "kind" specifies the kind of method that should be generated.
+/* Print declarations for "method".
  */
-void cpp_generator::decl_printer::print_method(FunctionDecl *method,
-	function_kind kind)
+void cpp_generator::decl_printer::print_method(const Method &method)
 {
-	print_method(method, kind, {});
+	print_method_header(method);
 }
 
 /* Print declarations or implementations of constructors.
@@ -388,14 +607,8 @@ void cpp_generator::decl_printer::print_method(FunctionDecl *method,
  */
 void cpp_generator::class_printer::print_constructors()
 {
-	function_set::const_iterator in;
-	const function_set &constructors = clazz.constructors;
-
-	for (in = constructors.begin(); in != constructors.end(); ++in) {
-		FunctionDecl *cons = *in;
-
-		print_method(cons, function_kind_constructor);
-	}
+	for (const auto &cons : clazz.constructors)
+		print_method(Method(clazz, cons));
 }
 
 /* Print declarations of copy assignment operator.
@@ -630,8 +843,6 @@ void cpp_generator::decl_printer::print_persistent_callback_data(
 void cpp_generator::decl_printer::print_persistent_callbacks()
 {
 	const char *cppname = cppstring.c_str();
-	set<FunctionDecl *>::const_iterator in;
-	const set<FunctionDecl *> &callbacks = clazz.persistent_callbacks;
 
 	if (!clazz.has_persistent_callbacks())
 		return;
@@ -639,37 +850,20 @@ void cpp_generator::decl_printer::print_persistent_callbacks()
 	osprintf(os, "private:\n");
 	osprintf(os, "  inline %s &copy_callbacks(const %s &obj);\n",
 		cppname, cppname);
-	for (in = callbacks.begin(); in != callbacks.end(); ++in)
-		print_persistent_callback_data(*in);
+	for (const auto &callback : clazz.persistent_callbacks)
+		print_persistent_callback_data(callback);
 
 	osprintf(os, "public:\n");
-	for (in = callbacks.begin(); in != callbacks.end(); ++in)
-		print_method(*in, function_kind_member_method);
+	for (const auto &callback : clazz.persistent_callbacks)
+		print_method(Method(clazz, callback));
 }
 
 /* Print declarations or definitions for methods in the class.
  */
 void cpp_generator::class_printer::print_methods()
 {
-	map<string, function_set >::const_iterator it;
-
-	for (it = clazz.methods.begin(); it != clazz.methods.end(); ++it)
-		print_method_group(it->second);
-}
-
-/* Print a declaration for a method called "method_name" derived
- * from "fd", which sets an enum called "enum_name".
- *
- * The last argument is removed because it is replaced by
- * a break-up into several methods.
- */
-void cpp_generator::decl_printer::print_set_enum(FunctionDecl *fd,
-	const string &enum_name, const string &method_name)
-{
-	int n = fd->getNumParams();
-
-	print_method_header(fd, method_name, n - 1,
-				function_kind_member_method);
+	for (const auto &kvp : clazz.methods)
+		print_method_group(kvp.second, kvp.first);
 }
 
 /* Print declarations or implementations for the methods derived from "fd",
@@ -680,11 +874,11 @@ void cpp_generator::decl_printer::print_set_enum(FunctionDecl *fd,
  */
 void cpp_generator::class_printer::print_set_enums(FunctionDecl *fd)
 {
-	vector<set_enum>::const_iterator it;
-	const vector<set_enum> &set_enums = clazz.set_enums.at(fd);
+	for (const auto &set : clazz.set_enums.at(fd)) {
+		EnumMethod method(clazz, fd, set.method_name, set.name);
 
-	for (it = set_enums.begin(); it != set_enums.end(); ++it)
-		print_set_enum(fd, it->name, it->method_name);
+		print_method(method);
+	}
 }
 
 /* Print declarations or implementations for methods derived from functions
@@ -692,10 +886,8 @@ void cpp_generator::class_printer::print_set_enums(FunctionDecl *fd)
  */
 void cpp_generator::class_printer::print_set_enums()
 {
-	map<FunctionDecl *, vector<set_enum> >::const_iterator it;
-
-	for (it = clazz.set_enums.begin(); it != clazz.set_enums.end(); ++it)
-		print_set_enums(it->first);
+	for (const auto &kvp : clazz.set_enums)
+		print_set_enums(kvp.first);
 }
 
 /* Print a declaration for the "get" method "fd",
@@ -703,10 +895,9 @@ void cpp_generator::class_printer::print_set_enums()
  */
 void cpp_generator::decl_printer::print_get_method(FunctionDecl *fd)
 {
-	function_kind kind = function_kind_member_method;
 	string base = clazz.base_method_name(fd);
 
-	print_named_method(fd, base, kind);
+	print_method(Method(clazz, fd, base));
 }
 
 /* Update "convert" to reflect the next combination of automatic conversions
@@ -747,9 +938,12 @@ bool cpp_generator::class_printer::next_variant(FunctionDecl *fd,
 	return false;
 }
 
-/* Print a declaration or definition for method "fd".
+/* Print a declaration or definition for a method called "name"
+ * derived from "fd".
  *
- * For methods that are identified as "get" methods, also
+ * If the method was copied from a superclass, then print a definition
+ * that calls the corresponding method in the superclass.
+ * Otherwise, for methods that are identified as "get" methods, also
  * print a declaration or definition for the method
  * using a name that includes the "get_" prefix.
  *
@@ -757,43 +951,124 @@ bool cpp_generator::class_printer::next_variant(FunctionDecl *fd,
  * whether any of its arguments can be automatically converted
  * from something else, and, if so, generate a method
  * for each combination of converted arguments.
+ * Do so by constructing a ConversionMethod that changes the converted arguments
+ * to those of the sources of the conversions.
+ *
+ * Note that a method may be both copied from a superclass and
+ * have arguments that can be automatically converted.
+ * In this case, the conversion methods for the arguments
+ * call the corresponding method in this class, which
+ * in turn will call the method in the superclass.
  */
-void cpp_generator::class_printer::print_method_variants(FunctionDecl *fd)
+void cpp_generator::class_printer::print_method_variants(FunctionDecl *fd,
+	const std::string &name)
 {
-	function_kind kind = generator.get_method_kind(clazz, fd);
-	std::vector<bool> convert(fd->getNumParams());
+	Method method(clazz, fd, name);
+	std::vector<bool> convert(method.num_params());
 
-	print_method(fd, kind);
-	if (clazz.is_get_method(fd))
-		print_get_method(fd);
-	if (kind == function_kind_member_method)
-		while (next_variant(fd, convert))
-			print_method(fd, kind, convert);
+	if (method.clazz.copied_from.count(method.fd) == 0) {
+		print_method(method);
+		if (clazz.is_get_method(fd))
+			print_get_method(fd);
+	} else {
+		auto super = method.clazz.copied_from.at(method.fd);
+		print_method(ConversionMethod(method, super.name));
+	}
+	if (method.kind != Method::Kind::member_method)
+		return;
+	while (next_variant(fd, convert)) {
+		print_method(ConversionMethod(method, [&] (int pos) {
+			return get_param(fd, pos, convert);
+		}));
+	}
 }
 
-/* Print declarations or definitions for methods "methods".
+/* Given a function declaration representing a method,
+ * does this method have a single argument (beyond the object
+ * on which the method is called) that corresponds to
+ * an isl object?
  */
-void cpp_generator::class_printer::print_method_group(
+static bool has_single_isl_argument(FunctionDecl *fd)
+{
+	ParmVarDecl *param;
+
+	if (fd->getNumParams() != 2)
+		return false;
+
+	param = fd->getParamDecl(1);
+	return generator::is_isl_type(param->getOriginalType());
+}
+
+/* Does the set "methods" contain exactly one function declaration
+ * that corresponds to a method of "clazz" itself (i.e., that
+ * was not copied from an ancestor)?
+ */
+static FunctionDecl *single_local(const isl_class &clazz,
 	const function_set &methods)
 {
-	function_set::const_iterator it;
+	int count = 0;
+	FunctionDecl *local;
 
-	for (it = methods.begin(); it != methods.end(); ++it)
-		print_method_variants(*it);
+	for (const auto &fn : methods) {
+		if (!clazz.first_arg_matches_class(fn))
+			continue;
+		++count;
+		local = fn;
+	}
+
+	return count == 1 ? local : NULL;
 }
 
-/* Print a declaration for a method called "name" derived from "fd".
- *
- * "kind" specifies the kind of method that should be generated.
- *
- * "convert" specifies which of the method arguments should
- * be automatically converted.
+/* Given a function declaration "fd" for a method called "name"
+ * with a single argument representing an isl object,
+ * generate declarations or definitions for methods with the same name,
+ * but with as argument an isl object of a class that can be implicitly
+ * converted to that of the original argument.
+ * In particular, generate methods for converting this argument.
  */
-void cpp_generator::decl_printer::print_named_method(
-	FunctionDecl *fd, const string &name, function_kind kind,
-	const std::vector<bool> &convert)
+void cpp_generator::class_printer::print_descendent_overloads(FunctionDecl *fd,
+	const std::string &name)
 {
-	print_named_method_header(fd, name, kind, convert);
+	Method method(clazz, fd, name);
+	ParmVarDecl *param = fd->getParamDecl(1);
+	QualType type = param->getOriginalType();
+	std::string arg = type->getPointeeType().getAsString();
+
+	for (const auto &kvp : generator.classes[arg].construction_types) {
+		const auto sub = kvp.second;
+		print_method(ConversionMethod(method, [&] (int pos) {
+			return sub;
+		}));
+	}
+}
+
+/* Print declarations or definitions for methods called "name"
+ * derived from "methods".
+ *
+ * If the group of methods contains both methods originally defined
+ * in the printed class
+ * and methods that have been copied from an ancestor (meaning that there
+ * are at least two methods in the group) and if only one of them
+ * was originally defined in "clazz", then add variants that take
+ * as arguments those types that can be converted to the original argument type
+ * through a unary constructor.
+ * Only do this for methods with a single (isl object) argument.
+ */
+void cpp_generator::class_printer::print_method_group(
+	const function_set &methods, const std::string &name)
+{
+	FunctionDecl *local;
+
+	for (const auto &fd : methods)
+		print_method_variants(fd, name);
+	if (methods.size() <= 1)
+		return;
+	local = single_local(clazz, methods);
+	if (!local)
+		return;
+	if (!has_single_isl_argument(local))
+		return;
+	print_descendent_overloads(local, name);
 }
 
 /* Print implementations for class "clazz" to "os".
@@ -1057,27 +1332,15 @@ void cpp_generator::impl_printer::print_public_constructors()
 /* Print definition for "method",
  * without any automatic type conversions.
  *
- * "kind" specifies the kind of method that should be generated.
- *
  * This method distinguishes three kinds of methods: member methods, static
  * methods, and constructors.
  *
- * Member methods call "method" by passing to the underlying isl function the
- * isl object belonging to "this" as first argument and the remaining arguments
- * as subsequent arguments.
- *
- * Static methods call "method" by passing all arguments to the underlying isl
- * function, as no this-pointer is available. The result is a newly managed
+ * Member methods and static methods return a newly managed
  * isl C++ object.
  *
  * Constructors create a new object from a given set of input parameters. They
  * do not return a value, but instead update the pointer stored inside the
  * newly created object.
- *
- * If the method has a callback argument, we reduce the number of parameters
- * that are exposed by one to hide the user pointer from the interface. On
- * the C++ side no user pointer is needed, as arguments can be forwarded
- * as part of the std::function argument which specifies the callback function.
  *
  * Unless checked C++ bindings are being generated,
  * the inputs of the method are first checked for being valid isl objects and
@@ -1087,45 +1350,30 @@ void cpp_generator::impl_printer::print_public_constructors()
  * During the function call, isl is made not to print any error message
  * because the error message is included in the exception.
  */
-void cpp_generator::impl_printer::print_method(FunctionDecl *method,
-	function_kind kind)
+void cpp_generator::impl_printer::print_method(const Method &method)
 {
-	string methodname = method->getName().str();
-	int num_params = method->getNumParams();
+	string methodname = method.fd->getName().str();
+	int num_params = method.c_num_params();
 
 	osprintf(os, "\n");
-	print_method_header(method, kind);
+	print_method_header(method);
 	osprintf(os, "{\n");
-	print_argument_validity_check(method, kind);
-	print_save_ctx(method, kind);
+	print_argument_validity_check(method);
+	print_save_ctx(method);
 	print_on_error_continue();
 
-	for (int i = 0; i < num_params; ++i) {
-		ParmVarDecl *param = method->getParamDecl(i);
-		if (is_callback(param->getType())) {
-			num_params -= 1;
-			print_callback_local(param);
-		}
-	}
+	if (method.callback)
+		print_callback_local(method.callback);
 
-	osprintf(os, "  auto res = %s(", methodname.c_str());
+	osprintf(os, "  auto res = %s", methodname.c_str());
 
-	for (int i = 0; i < num_params; ++i) {
-		ParmVarDecl *param = method->getParamDecl(i);
-		bool load_from_this_ptr = false;
+	Method::print_arg_list(os, 0, num_params, [&] (int i) {
+		method.print_param_use(os, i);
+	});
+	osprintf(os, ";\n");
 
-		if (i == 0 && kind == function_kind_member_method)
-			load_from_this_ptr = true;
-
-		generator.print_method_param_use(os, param, load_from_this_ptr);
-
-		if (i != num_params - 1)
-			osprintf(os, ", ");
-	}
-	osprintf(os, ");\n");
-
-	print_exceptional_execution_check(method, kind);
-	if (kind == function_kind_constructor) {
+	print_exceptional_execution_check(method);
+	if (method.kind == Method::Kind::constructor) {
 		osprintf(os, "  ptr = res;\n");
 	} else {
 		print_method_return(method);
@@ -1134,55 +1382,64 @@ void cpp_generator::impl_printer::print_method(FunctionDecl *method,
 	osprintf(os, "}\n");
 }
 
-/* Print a definition for "method",
- * where at least one of the argument types needs to be converted,
- * as specified by "convert".
+/* Convert argument of type "src" to "dst", with a name specified by "dst".
  *
- * "kind" specifies the kind of method that should be generated and
- * is assumed to be set to function_kind_member_method.
+ * If "src" is the same as "dst", then no argument conversion is needed.
+ *
+ * Otherwise, call the conversion function
+ * with as arguments the isl_ctx of the object and the argument name,
+ * or simply the argument name if the source type is an isl type.
+ * This means this isl_ctx should be available.
+ */
+void cpp_generator::impl_printer::print_arg_conversion(ParmVarDecl *dst,
+	ParmVarDecl *src)
+{
+	std::string name = dst->getName().str();
+	QualType type = dst->getOriginalType();
+	string cpptype = generator.param2cpp(type);
+
+	if (dst == src)
+		os << name;
+	else if (is_isl_type(src->getOriginalType()))
+		os << cpptype << "(" << name << ")";
+	else
+		os << cpptype << "(ctx(), " << name << ")";
+}
+
+/* Print a definition for "method",
+ * where "this" or at least one of the argument types needs to be converted.
+ *
+ * "method" is assumed to be a member method.
  *
  * The generated method performs the required conversion(s) and
  * calls the method generated without conversions.
  *
- * Each conversion is performed by calling the conversion function
- * with as arguments the isl_ctx of the object and the argument
- * to the generated method.
+ * Perform a conversion from the argument in the method declaration
+ * (as specified by Method::get_param) to the argument of the C function,
+ * if needed.
+ * Such a conversion may require the isl_ctx to be available.
  * In order to be able to use this isl_ctx, the current object needs
  * to valid.  The validity of other arguments is checked
  * by the called method.
  */
-void cpp_generator::impl_printer::print_method(FunctionDecl *method,
-	function_kind kind,
-	const std::vector<bool> &convert)
+void cpp_generator::impl_printer::print_method(const ConversionMethod &method)
 {
-	string name = clazz.method_name(method);
-	int num_params = method->getNumParams();
-
-	if (kind != function_kind_member_method)
+	if (method.kind != Method::Kind::member_method)
 		die("Automatic conversion currently only supported "
 		    "for object methods");
 
 	osprintf(os, "\n");
-	print_named_method_header(method, name, kind, convert);
+	print_method_header(method);
 	osprintf(os, "{\n");
 	print_check_ptr("ptr");
-	osprintf(os, "  return this->%s(", name.c_str());
-	for (int i = 1; i < num_params; ++i) {
-		ParmVarDecl *param = method->getParamDecl(i);
-		std::string name = param->getName().str();
+	osprintf(os, "  return ");
+	method.print_call(os, generator.isl_namespace());
+	method.print_cpp_arg_list(os, [&] (int i) {
+		ParmVarDecl *param = method.fd->getParamDecl(i);
 
-		if (i != 1)
-			osprintf(os, ", ");
-		if (convert[i]) {
-			QualType type = param->getOriginalType();
-			string cpptype = generator.param2cpp(type);
-			osprintf(os, "%s(ctx(), %s)",
-				cpptype.c_str(), name.c_str());
-		} else {
-			osprintf(os, "%s", name.c_str());
-		}
-	}
-	osprintf(os, ");\n");
+		print_arg_conversion(param, method.get_param(i));
+	});
+	osprintf(os, ";\n");
 	osprintf(os, "}\n");
 }
 
@@ -1353,8 +1610,6 @@ void cpp_generator::impl_printer::print_persistent_callbacks()
 {
 	const char *cppname = cppstring.c_str();
 	string classname = type2cpp(clazz);
-	set<FunctionDecl *>::const_iterator in;
-	const set<FunctionDecl *> &callbacks = clazz.persistent_callbacks;
 
 	if (!clazz.has_persistent_callbacks())
 		return;
@@ -1363,8 +1618,8 @@ void cpp_generator::impl_printer::print_persistent_callbacks()
 	osprintf(os, "%s &%s::copy_callbacks(const %s &obj)\n",
 		cppname, classname.c_str(), cppname);
 	osprintf(os, "{\n");
-	for (in = callbacks.begin(); in != callbacks.end(); ++in) {
-		string callback_name = clazz.persistent_callback_name(*in);
+	for (const auto &callback : clazz.persistent_callbacks) {
+		string callback_name = clazz.persistent_callback_name(callback);
 
 		osprintf(os, "  %s_data = obj.%s_data;\n",
 			callback_name.c_str(), callback_name.c_str());
@@ -1372,53 +1627,8 @@ void cpp_generator::impl_printer::print_persistent_callbacks()
 	osprintf(os, "  return *this;\n");
 	osprintf(os, "}\n");
 
-	for (in = callbacks.begin(); in != callbacks.end(); ++in) {
-		function_kind kind = function_kind_member_method;
-
-		print_set_persistent_callback(*in, kind);
-	}
-}
-
-/* Print the definition for a method called "method_name" derived
- * from "fd", which sets an enum called "enum_name".
- *
- * The last argument of the C function does not appear in the method call,
- * but is fixed to "enum_name" instead.
- * Other than that, the method printed here is similar to one
- * printed by cpp_generator::print_method_impl, except that
- * some of the special cases do not occur.
- */
-void cpp_generator::impl_printer::print_set_enum(FunctionDecl *fd,
-	const string &enum_name, const string &method_name)
-{
-	string c_name = fd->getName().str();
-	int n = fd->getNumParams();
-	function_kind kind = function_kind_member_method;
-
-	osprintf(os, "\n");
-	print_method_header(fd, method_name, n - 1, kind);
-	osprintf(os, "{\n");
-
-	print_argument_validity_check(fd, kind);
-	print_save_ctx(fd, kind);
-	print_on_error_continue();
-
-	osprintf(os, "  auto res = %s(", c_name.c_str());
-
-	for (int i = 0; i < n - 1; ++i) {
-		ParmVarDecl *param = fd->getParamDecl(i);
-
-		if (i > 0)
-			osprintf(os, ", ");
-		generator.print_method_param_use(os, param, i == 0);
-	}
-	osprintf(os, ", %s", enum_name.c_str());
-	osprintf(os, ");\n");
-
-	print_exceptional_execution_check(fd, kind);
-	print_method_return(fd);
-
-	osprintf(os, "}\n");
+	for (const auto &callback : clazz.persistent_callbacks)
+		print_set_persistent_callback(Method(clazz, callback));
 }
 
 /* Print a definition for the "get" method "fd" in class "clazz",
@@ -1432,11 +1642,10 @@ void cpp_generator::impl_printer::print_get_method(FunctionDecl *fd)
 {
 	string get_name = clazz.base_method_name(fd);
 	string name = clazz.method_name(fd);
-	function_kind kind = function_kind_member_method;
 	int num_params = fd->getNumParams();
 
 	osprintf(os, "\n");
-	print_named_method_header(fd, get_name, kind);
+	print_method_header(Method(clazz, fd, get_name));
 	osprintf(os, "{\n");
 	osprintf(os, "  return %s(", name.c_str());
 	for (int i = 1; i < num_params; ++i) {
@@ -1450,13 +1659,16 @@ void cpp_generator::impl_printer::print_get_method(FunctionDecl *fd)
 	osprintf(os, "}\n");
 }
 
-/* Print the use of "param" to "os".
+/* Print the use of the argument at position "pos" to "os".
  *
- * "load_from_this_ptr" specifies whether the parameter should be loaded from
- * the this-ptr.  In case a value is loaded from a this pointer, the original
+ * Member methods pass the isl object corresponding to "this"
+ * as first argument (at position 0).
+ * Any other arguments are passed along from the method arguments.
+ *
+ * If the argument value is loaded from a this pointer, the original
  * value must be preserved and must consequently be copied.  Values that are
- * loaded from parameters do not need to be preserved, as such values will
- * already be copies of the actual parameters.  It is consequently possible
+ * loaded from method parameters do not need to be preserved, as such values
+ * will already be copies of the actual parameters.  It is consequently possible
  * to directly take the pointer from these values, which saves
  * an unnecessary copy.
  *
@@ -1468,9 +1680,10 @@ void cpp_generator::impl_printer::print_get_method(FunctionDecl *fd)
  * in a structure called <name>_data.
  * The caller of this function must ensure that these variables exist.
  */
-void cpp_generator::print_method_param_use(ostream &os, ParmVarDecl *param,
-	bool load_from_this_ptr)
+void Method::print_param_use(ostream &os, int pos) const
 {
+	ParmVarDecl *param = fd->getParamDecl(pos);
+	bool load_from_this_ptr = pos == 0 && kind == member_method;
 	string name = param->getName().str();
 	const char *name_str = name.c_str();
 	QualType type = param->getOriginalType();
@@ -1480,12 +1693,12 @@ void cpp_generator::print_method_param_use(ostream &os, ParmVarDecl *param,
 		return;
 	}
 
-	if (is_string(type)) {
+	if (generator::is_string(type)) {
 		osprintf(os, "%s.c_str()", name_str);
 		return;
 	}
 
-	if (is_callback(type)) {
+	if (generator::is_callback(type)) {
 		osprintf(os, "%s_lambda, ", name_str);
 		osprintf(os, "&%s_data", name_str);
 		return;
@@ -1494,7 +1707,7 @@ void cpp_generator::print_method_param_use(ostream &os, ParmVarDecl *param,
 	if (!load_from_this_ptr)
 		osprintf(os, "%s.", name_str);
 
-	if (keeps(param)) {
+	if (generator::keeps(param)) {
 		osprintf(os, "get()");
 	} else {
 		if (load_from_this_ptr)
@@ -1506,13 +1719,12 @@ void cpp_generator::print_method_param_use(ostream &os, ParmVarDecl *param,
 
 /* Print code that checks that all isl object arguments to "method" are valid
  * (not NULL) and throws an exception if they are not.
- * "kind" specifies the kind of method that is being generated.
  *
  * If checked bindings are being generated,
  * then no such check is performed.
  */
 void cpp_generator::impl_printer::print_argument_validity_check(
-	FunctionDecl *method, function_kind kind)
+	const Method &method)
 {
 	int n;
 	bool first = true;
@@ -1520,15 +1732,15 @@ void cpp_generator::impl_printer::print_argument_validity_check(
 	if (generator.checked)
 		return;
 
-	n = method->getNumParams();
+	n = method.num_params();
 	for (int i = 0; i < n; ++i) {
 		bool is_this;
-		ParmVarDecl *param = method->getParamDecl(i);
+		ParmVarDecl *param = method.fd->getParamDecl(i);
 		string name = param->getName().str();
 		const char *name_str = name.c_str();
 		QualType type = param->getOriginalType();
 
-		is_this = i == 0 && kind == function_kind_member_method;
+		is_this = i == 0 && method.kind == Method::Kind::member_method;
 		if (!is_this && (is_isl_ctx(type) || !is_isl_type(type)))
 			continue;
 
@@ -1553,7 +1765,6 @@ void cpp_generator::impl_printer::print_argument_validity_check(
 /* Print code for saving a copy of the isl::ctx available at the start
  * of the method "method" in a "saved_ctx" variable,
  * for use in exception handling.
- * "kind" specifies what kind of method "method" is.
  *
  * If checked bindings are being generated,
  * then the "saved_ctx" variable is not needed.
@@ -1563,16 +1774,15 @@ void cpp_generator::impl_printer::print_argument_validity_check(
  * Otherwise, save a copy of the isl::ctx associated to the first argument
  * of isl object type.
  */
-void cpp_generator::impl_printer::print_save_ctx(FunctionDecl *method,
-	function_kind kind)
+void cpp_generator::impl_printer::print_save_ctx(const Method &method)
 {
 	int n;
-	ParmVarDecl *param = method->getParamDecl(0);
+	ParmVarDecl *param = method.fd->getParamDecl(0);
 	QualType type = param->getOriginalType();
 
 	if (generator.checked)
 		return;
-	if (kind == function_kind_member_method) {
+	if (method.kind == Method::Kind::member_method) {
 		osprintf(os, "  auto saved_ctx = ctx();\n");
 		return;
 	}
@@ -1583,9 +1793,9 @@ void cpp_generator::impl_printer::print_save_ctx(FunctionDecl *method,
 		osprintf(os, "  auto saved_ctx = %s;\n", name);
 		return;
 	}
-	n = method->getNumParams();
+	n = method.num_params();
 	for (int i = 0; i < n; ++i) {
-		ParmVarDecl *param = method->getParamDecl(i);
+		ParmVarDecl *param = method.fd->getParamDecl(i);
 		QualType type = param->getOriginalType();
 
 		if (!is_isl_type(type))
@@ -1617,8 +1827,8 @@ void cpp_generator::impl_printer::print_on_error_continue()
 }
 
 /* Print code to "os" that checks whether any of the persistent callbacks
- * of "clazz" is set and if it failed with an exception.  If so, the "eptr"
- * in the corresponding data structure contains the exception
+ * of the class of "method" is set and if it failed with an exception.
+ * If so, the "eptr" in the corresponding data structure contains the exception
  * that was caught and that needs to be rethrown.
  * This field is cleared because the callback and its data may get reused.
  *
@@ -1626,16 +1836,13 @@ void cpp_generator::impl_printer::print_on_error_continue()
  * an object is needed for any of the persistent callbacks to be set.
  */
 static void print_persistent_callback_exceptional_execution_check(ostream &os,
-	const isl_class &clazz, cpp_generator::function_kind kind)
+	const Method &method)
 {
-	const set<FunctionDecl *> &callbacks = clazz.persistent_callbacks;
-	set<FunctionDecl *>::const_iterator in;
-
-	if (kind != cpp_generator::function_kind_member_method)
+	if (method.kind != Method::Kind::member_method)
 		return;
 
-	for (in = callbacks.begin(); in != callbacks.end(); ++in) {
-		string callback_name = clazz.persistent_callback_name(*in);
+	for (const auto &pcb : method.clazz.persistent_callbacks) {
+		auto callback_name = method.clazz.persistent_callback_name(pcb);
 
 		osprintf(os, "  if (%s_data && %s_data->eptr) {\n",
 			callback_name.c_str(), callback_name.c_str());
@@ -1649,8 +1856,7 @@ static void print_persistent_callback_exceptional_execution_check(ostream &os,
 }
 
 /* Print code that checks whether the execution of the core of "method"
- * of class "clazz" was successful.
- * "kind" specifies what kind of method "method" is.
+ * was successful.
  *
  * If checked bindings are being generated,
  * then no checks are performed.
@@ -1667,25 +1873,20 @@ static void print_persistent_callback_exceptional_execution_check(ostream &os,
  * is available in the "ctx" variable.
  */
 void cpp_generator::impl_printer::print_exceptional_execution_check(
-	FunctionDecl *method, function_kind kind)
+	const Method &method)
 {
-	int n;
 	bool check_null, check_neg;
-	QualType return_type = method->getReturnType();
+	QualType return_type = method.fd->getReturnType();
 
 	if (generator.checked)
 		return;
 
-	print_persistent_callback_exceptional_execution_check(os, clazz, kind);
+	print_persistent_callback_exceptional_execution_check(os, method);
 
-	n = method->getNumParams();
-	for (int i = 0; i < n; ++i) {
-		ParmVarDecl *param = method->getParamDecl(i);
+	if (method.callback) {
 		const char *name;
 
-		if (!is_callback(param->getOriginalType()))
-			continue;
-		name = param->getName().str().c_str();
+		name = method.callback->getName().str().c_str();
 		osprintf(os, "  if (%s_data.eptr)\n", name);
 		osprintf(os, "    std::rethrow_exception(%s_data.eptr);\n",
 			name);
@@ -1703,29 +1904,29 @@ void cpp_generator::impl_printer::print_exceptional_execution_check(
 	print_throw_last_error(os);
 }
 
-/* Does "fd" modify an object of a subclass based on a type function?
+/* Does the isl function from which this method is derived
+ * modify an object of a subclass based on a type function?
  */
-static bool is_subclass_mutator(const isl_class &clazz, FunctionDecl *fd)
+bool Method::is_subclass_mutator() const
 {
 	return clazz.is_type_subclass() && generator::is_mutator(clazz, fd);
 }
 
-/* Return the C++ return type of the method corresponding to "fd" in "clazz".
+/* Return the C++ return type of the method "method".
  *
- * If "fd" modifies an object of a subclass, then return
+ * If the corresponding function modifies an object of a subclass, then return
  * the type of this subclass.
  * Otherwise, return the C++ counterpart of the actual return type.
  */
-std::string cpp_generator::get_return_type(const isl_class &clazz,
-	FunctionDecl *fd)
+std::string cpp_generator::get_return_type(const Method &method)
 {
-	if (is_subclass_mutator(clazz, fd))
-		return type2cpp(clazz);
+	if (method.is_subclass_mutator())
+		return type2cpp(method.clazz);
 	else
-		return param2cpp(fd->getReturnType());
+		return param2cpp(method.fd->getReturnType());
 }
 
-/* Given a function "method" for setting a "clazz" persistent callback,
+/* Given a method "method" for setting a persistent callback of its class,
  * print the implementations of the methods needed for that callback.
  *
  * In particular, print
@@ -1735,23 +1936,22 @@ std::string cpp_generator::get_return_type(const isl_class &clazz,
  * - the public method for constructing a new object with the callback set.
  */
 void cpp_generator::impl_printer::print_set_persistent_callback(
-	FunctionDecl *method,
-	function_kind kind)
+	const Method &method)
 {
-	string fullname = method->getName().str();
-	ParmVarDecl *param = persistent_callback_arg(method);
+	string fullname = method.fd->getName().str();
+	ParmVarDecl *param = persistent_callback_arg(method.fd);
 	string pname;
-	string callback_name = clazz.persistent_callback_name(method);
+	string callback_name = clazz.persistent_callback_name(method.fd);
 
 	osprintf(os, "\n");
-	print_persistent_callback_prototype(method);
+	print_persistent_callback_prototype(method.fd);
 	osprintf(os, "\n");
 	osprintf(os, "{\n");
 	print_callback_body(2, param, callback_name);
 	osprintf(os, "}\n\n");
 
 	pname = param->getName().str();
-	print_persistent_callback_setter_prototype(method);
+	print_persistent_callback_setter_prototype(method.fd);
 	osprintf(os, "\n");
 	osprintf(os, "{\n");
 	print_check_ptr_start("ptr");
@@ -1764,7 +1964,7 @@ void cpp_generator::impl_printer::print_set_persistent_callback(
 	print_check_ptr_end("ptr");
 	osprintf(os, "}\n\n");
 
-	print_method_header(method, kind);
+	print_method_header(method);
 	osprintf(os, "{\n");
 	osprintf(os, "  auto copy = *this;\n");
 	osprintf(os, "  copy.set_%s_data(%s);\n",
@@ -1773,10 +1973,9 @@ void cpp_generator::impl_printer::print_set_persistent_callback(
 	osprintf(os, "}\n");
 }
 
-/* Print the return statement of the C++ method corresponding
- * to the C function "method".
+/* Print the return statement of the C++ method "method".
  *
- * The result of the isl function is returned as a new
+ * The result of the corresponding isl function is returned as a new
  * object if the underlying isl function returns an isl_* ptr, as a bool
  * if the isl function returns an isl_bool, as void if the isl functions
  * returns an isl_stat,
@@ -1793,16 +1992,16 @@ void cpp_generator::impl_printer::print_set_persistent_callback(
  * if the return type corresponds to the superclass data type,
  * then it is replaced by the subclass data type.
  */
-void cpp_generator::impl_printer::print_method_return(FunctionDecl *method)
+void cpp_generator::impl_printer::print_method_return(const Method &method)
 {
-	QualType return_type = method->getReturnType();
-	string rettype_str = generator.get_return_type(clazz, method);
-	bool returns_super = is_subclass_mutator(clazz, method);
+	QualType return_type = method.fd->getReturnType();
+	string rettype_str = generator.get_return_type(method);
+	bool returns_super = method.is_subclass_mutator();
 
 	if (is_isl_type(return_type) ||
 		    (generator.checked && is_isl_neg_error(return_type))) {
 		osprintf(os, "  return manage(res)");
-		if (is_mutator(clazz, method) &&
+		if (is_mutator(clazz, method.fd) &&
 		    clazz.has_persistent_callbacks())
 			osprintf(os, ".copy_callbacks(*this)");
 		if (returns_super)
@@ -1812,7 +2011,7 @@ void cpp_generator::impl_printer::print_method_return(FunctionDecl *method)
 		osprintf(os, "  return;\n");
 	} else if (is_string(return_type)) {
 		osprintf(os, "  std::string tmp(res);\n");
-		if (gives(method))
+		if (gives(method.fd))
 			osprintf(os, "  free(res);\n");
 		osprintf(os, "  return tmp;\n");
 	} else {
@@ -1824,32 +2023,21 @@ void cpp_generator::impl_printer::print_method_return(FunctionDecl *method)
  * However, if this parameter should be converted, as indicated
  * by "convert", then return the second formal parameter
  * of the conversion function instead.
- *
- * If "convert" is empty, then it is assumed that
- * none of the arguments should be converted.
  */
 ParmVarDecl *cpp_generator::class_printer::get_param(FunctionDecl *fd, int pos,
 	const std::vector<bool> &convert)
 {
 	ParmVarDecl *param = fd->getParamDecl(pos);
 
-	if (convert.size() == 0)
-		return param;
 	if (!convert[pos])
 		return param;
 	return generator.conversions[param->getOriginalType().getTypePtr()];
 }
 
-/* Print the header for "method", with name "cname" and
- * "num_params" number of arguments.
+/* Print the header for "method".
  *
  * Print the header of a declaration if this->declarations is set,
  * otherwise print the header of a method definition.
- *
- * "kind" specifies the kind of method that should be generated.
- *
- * "convert" specifies which of the method arguments should
- * be automatically converted.
  *
  * This function prints headers for member methods, static methods, and
  * constructors, either for their declaration or definition.
@@ -1872,8 +2060,7 @@ ParmVarDecl *cpp_generator::class_printer::get_param(FunctionDecl *fd, int pos,
  * For static functions and constructors all parameters of the original isl
  * function are exposed.
  *
- * Parameters that are defined as __isl_keep, are of type string or
- * are callbacks, are passed
+ * Parameters of which no copy is required, are passed
  * as const reference, which allows the compiler to optimize the parameter
  * transfer.
  *
@@ -1884,113 +2071,61 @@ ParmVarDecl *cpp_generator::class_printer::get_param(FunctionDecl *fd, int pos,
  * for these constructors, whereas without a comment not every user would
  * know that implicit construction is allowed in absence of an explicit keyword.
  *
- * If any of the arguments needs to be converted, then the argument
- * of the method is changed to that of the source of the conversion.
+ * Note that in case "method" is a ConversionMethod, the argument returned
+ * by Method::get_param may be different from the original argument.
  * The name of the argument is, however, derived from the original
  * function argument.
  */
-void cpp_generator::class_printer::print_method_header(
-	FunctionDecl *method, const string &cname, int num_params,
-	function_kind kind,
-	const std::vector<bool> &convert)
+void cpp_generator::class_printer::print_method_header(const Method &method)
 {
-	string rettype_str = generator.get_return_type(clazz, method);
-	int first_param = 0;
-
-	if (kind == function_kind_member_method)
-		first_param = 1;
+	string rettype_str = generator.get_return_type(method);
 
 	if (declarations) {
 		osprintf(os, "  ");
 
-		if (kind == function_kind_static_method)
+		if (method.kind == Method::Kind::static_method)
 			osprintf(os, "static ");
 
 		osprintf(os, "inline ");
 
-		if (kind == function_kind_constructor) {
-			if (generator.is_implicit_conversion(clazz, method))
+		if (method.kind == Method::Kind::constructor) {
+			if (generator.is_implicit_conversion(method))
 				osprintf(os, "/* implicit */ ");
 			else
 				osprintf(os, "explicit ");
 		}
 	}
 
-	if (kind != function_kind_constructor)
+	if (method.kind != Method::Kind::constructor)
 		osprintf(os, "%s ", rettype_str.c_str());
 
 	if (!declarations)
 		osprintf(os, "%s::", cppstring.c_str());
 
-	if (kind != function_kind_constructor)
-		osprintf(os, "%s", cname.c_str());
+	if (method.kind != Method::Kind::constructor)
+		osprintf(os, "%s", method.name.c_str());
 	else
 		osprintf(os, "%s", cppstring.c_str());
 
-	osprintf(os, "(");
-
-	for (int i = first_param; i < num_params; ++i) {
-		std::string name = method->getParamDecl(i)->getName().str();
-		ParmVarDecl *param = get_param(method, i, convert);
+	method.print_cpp_arg_list(os, [&] (int i) {
+		std::string name = method.fd->getParamDecl(i)->getName().str();
+		ParmVarDecl *param = method.get_param(i);
 		QualType type = param->getOriginalType();
 		string cpptype = generator.param2cpp(type);
 
-		if (is_callback(type))
-			num_params--;
-
-		if (keeps(param) || is_string(type) || is_callback(type))
+		if (!method.param_needs_copy(i))
 			osprintf(os, "const %s &%s", cpptype.c_str(),
 				 name.c_str());
 		else
 			osprintf(os, "%s %s", cpptype.c_str(), name.c_str());
+	});
 
-		if (i != num_params - 1)
-			osprintf(os, ", ");
-	}
-
-	osprintf(os, ")");
-
-	if (kind == function_kind_member_method)
+	if (method.kind == Method::Kind::member_method)
 		osprintf(os, " const");
 
 	if (declarations)
 		osprintf(os, ";");
 	osprintf(os, "\n");
-}
-
-/* Print the header for a method called "name" derived from "method".
- *
- * Print the header of a declaration if this->declarations is set,
- * otherwise print the header of a method definition.
- *
- * "kind" specifies the kind of method that should be generated.
- *
- * "convert" specifies which of the method arguments should
- * be automatically converted.
- */
-void cpp_generator::class_printer::print_named_method_header(
-	FunctionDecl *method, string name, function_kind kind,
-	const std::vector<bool> &convert)
-{
-	int num_params = method->getNumParams();
-
-	name = generator.rename_method(name);
-	print_method_header(method, name, num_params, kind, convert);
-}
-
-/* Print the header for "method" using its default name.
- *
- * Print the header of a declaration if this->declarations is set,
- * otherwise print the header of a method definition.
- *
- * "kind" specifies the kind of method that should be generated.
- */
-void cpp_generator::class_printer::print_method_header(
-	FunctionDecl *method, function_kind kind)
-{
-	string name = clazz.method_name(method);
-
-	print_named_method_header(method, name, kind);
 }
 
 /* Generate the list of argument types for a callback function of
@@ -2328,7 +2463,7 @@ static const char *rename_map[][2] = {
  * match the name in the C bindings. We do this for example to avoid
  * C++ keywords.
  */
-std::string cpp_generator::rename_method(std::string name)
+static std::string rename_method(std::string name)
 {
 	for (size_t i = 0; i < sizeof(rename_map) / sizeof(rename_map[0]); i++)
 		if (name.compare(rename_map[i][0]) == 0)
@@ -2442,13 +2577,13 @@ bool cpp_generator::is_subclass(QualType subclass_type,
  * parameter, where the parameter type is a subclass of the class that is
  * currently being generated.
  */
-bool cpp_generator::is_implicit_conversion(const isl_class &clazz,
-	FunctionDecl *cons)
+bool cpp_generator::is_implicit_conversion(const Method &cons)
 {
-	ParmVarDecl *param = cons->getParamDecl(0);
+	const auto &clazz = cons.clazz;
+	ParmVarDecl *param = cons.fd->getParamDecl(0);
 	QualType type = param->getOriginalType();
 
-	int num_params = cons->getNumParams();
+	int num_params = cons.fd->getNumParams();
 	if (num_params != 1)
 		return false;
 
@@ -2462,13 +2597,263 @@ bool cpp_generator::is_implicit_conversion(const isl_class &clazz,
  *
  * Given the declaration of a static or member method, returns its kind.
  */
-cpp_generator::function_kind cpp_generator::get_method_kind(
-	const isl_class &clazz, FunctionDecl *method)
+static Method::Kind get_kind(const isl_class &clazz, FunctionDecl *method)
 {
-	if (is_static(clazz, method))
-		return function_kind_static_method;
+	if (generator::is_constructor(method))
+		return Method::Kind::constructor;
+	else if (generator::is_static(clazz, method))
+		return Method::Kind::static_method;
 	else
-		return function_kind_member_method;
+		return Method::Kind::member_method;
+}
+
+/* Return the callback argument of "fd", if there is any.
+ * Return NULL otherwise.
+ */
+static ParmVarDecl *find_callback_arg(FunctionDecl *fd)
+{
+	int num_params = fd->getNumParams();
+
+	for (int i = 0; i < num_params; ++i) {
+		ParmVarDecl *param = fd->getParamDecl(i);
+		if (generator::is_callback(param->getType()))
+			return param;
+	}
+
+	return NULL;
+}
+
+/* Construct a C++ method object from the class to which is belongs,
+ * the isl function from which it is derived and the method name.
+ *
+ * Perform any renaming of the method that may be required and
+ * determine the type of the method.
+ */
+Method::Method(const isl_class &clazz, FunctionDecl *fd,
+	const std::string &name) :
+		clazz(clazz), fd(fd), name(rename_method(name)),
+		kind(get_kind(clazz, fd)),
+		callback(find_callback_arg(fd))
+{
+}
+
+/* Construct a C++ method object from the class to which is belongs and
+ * the isl function from which it is derived.
+ *
+ * Obtain the default method name and continue
+ * with the generic constructor.
+ */
+Method::Method(const isl_class &clazz, FunctionDecl *fd) :
+	Method(clazz, fd, clazz.method_name(fd))
+{
+}
+
+/* Return the number of parameters of the corresponding C function.
+ *
+ * If the method has a callback argument, we reduce the number of parameters
+ * that are exposed by one to hide the user pointer from the interface. On
+ * the C++ side no user pointer is needed, as arguments can be forwarded
+ * as part of the std::function argument which specifies the callback function.
+ *
+ * The user pointer is also removed from the number of parameters
+ * of the C function because the pair of callback and user pointer
+ * is considered as a single argument that is printed as a whole
+ * by Method::print_param_use.
+ */
+int Method::c_num_params() const
+{
+	return fd->getNumParams() - (callback != NULL);
+}
+
+/* Return the number of parameters of the method
+ * (including the implicit "this").
+ *
+ * By default, it is the same as the number of parameters
+ * of the corresponding C function.
+ */
+int Method::num_params() const
+{
+	return c_num_params();
+}
+
+/* Print the arguments from "start" (inclusive) to "end" (exclusive)
+ * as arguments to a method of C function call, using "print_arg"
+ * to print each individual argument.
+ */
+void Method::print_arg_list(std::ostream &os, int start, int end,
+	const std::function<void(int i)> &print_arg)
+{
+	os << "(";
+	for (int i = start; i < end; ++i) {
+		if (i != start)
+			os << ", ";
+		print_arg(i);
+	}
+	os << ")";
+}
+
+/* Print the arguments to the method call, using "print_arg"
+ * to print each individual argument.
+ */
+void Method::print_cpp_arg_list(std::ostream &os,
+	const std::function<void(int i)> &print_arg) const
+{
+	int first_param = kind == member_method ? 1 : 0;
+	print_arg_list(os, first_param, num_params(), print_arg);
+}
+
+/* Should the parameter at position "pos" be a copy (rather than
+ * a const reference)?
+ *
+ * Strictly speaking, a copy is only needed on isl types that are
+ * not marked __isl_keep, since those will be release()'d
+ * by code printed by Method::print_param_use.
+ *
+ * However, there may be other arguments such as integer types
+ * that are more naturally passed as a copy.
+ * The default is therefore to require a copy, except for
+ * arguments marked __isl_keep, string arguments or callback arguments.
+ */
+bool Method::param_needs_copy(int pos) const
+{
+	ParmVarDecl *param = get_param(pos);
+	QualType type = param->getOriginalType();
+
+	if (generator::keeps(param))
+		return false;
+	if (generator::is_string(type) || generator::is_callback(type))
+		return false;
+	return true;
+}
+
+/* Return the method argument at position "pos".
+ */
+clang::ParmVarDecl *Method::get_param(int pos) const
+{
+	return fd->getParamDecl(pos);
+}
+
+/* Construct a method that performs one or more conversions
+ * from the original Method (without conversions),
+ * the name of the type to which "this" should be converted and
+ * a function for determining the arguments of the constructed method.
+ */
+ConversionMethod::ConversionMethod(const Method &method,
+	const std::string &this_type,
+	const std::function<clang::ParmVarDecl *(int pos)> &get_param) :
+		Method(method), this_type(this_type), get_param_fn(get_param)
+{
+}
+
+/* Construct a method that only performs a conversion on "this"
+ * from the original Method (without conversions) and
+ * the name of the type to which "this" should be converted.
+ *
+ * Call the generic constructor with
+ * a function for determining the arguments of the constructed method
+ * that performs no conversion.
+ */
+ConversionMethod::ConversionMethod(const Method &method,
+	const std::string &this_type) :
+		ConversionMethod(method, this_type, [this] (int pos) {
+			return Method::get_param(pos);
+		})
+{
+}
+
+/* Construct a method that performs one or more argument conversions
+ * from the original Method (without conversions) and
+ * a function for determining the arguments of the constructed method.
+ *
+ * Call the generic constructor with method.clazz.name as "this" type,
+ * indicating that "this" should not be converted.
+ */
+ConversionMethod::ConversionMethod(const Method &method,
+	const std::function<clang::ParmVarDecl *(int pos)> &get_param) :
+		ConversionMethod(method, method.clazz.name, get_param)
+{
+}
+
+/* Should the parameter at position "pos" be a copy (rather than
+ * a const reference)?
+ *
+ * Unlike methods that call an isl C function,
+ * a conversion method never calls release() on an isl type argument,
+ * so they can all be passed as const references.
+ *
+ * For other types, use the same defaults as Method.
+ */
+bool ConversionMethod::param_needs_copy(int pos) const
+{
+	ParmVarDecl *param = get_param(pos);
+	QualType type = param->getOriginalType();
+
+	if (generator::is_isl_type(type))
+		return false;
+
+	return Method::param_needs_copy(pos);
+}
+
+/* Return the method argument at position "pos".
+ *
+ * Call get_param_fn to determine this argument.
+ */
+clang::ParmVarDecl *ConversionMethod::get_param(int pos) const
+{
+	return get_param_fn(pos);
+}
+
+/* Print a call to the method (without the arguments),
+ * with "ns" the namespace of the generated C++ bindings.
+ *
+ * If "this_type" is different from the name of the class of the method,
+ * then "this" needs to be converted to that type before
+ * the call is performed.
+ */
+void ConversionMethod::print_call(std::ostream &os, const std::string &ns) const
+{
+	if (clazz.name == this_type) {
+		os << "this->";
+	} else {
+		auto cpp_type = ns + cpp_generator::type2cpp(this_type);
+		os << cpp_type << "(*this).";
+	}
+	os << name;
+}
+
+/* Construct an object representing a C++ method for setting an enum
+ * from the class to which is belongs,
+ * the isl function from which it is derived and the method and enum names.
+ */
+EnumMethod::EnumMethod(const isl_class &clazz, FunctionDecl *fd,
+	const std::string &method_name, const std::string &enum_name) :
+		Method(clazz, fd, method_name), enum_name(enum_name)
+{
+}
+
+/* Print the use of the argument at position "pos" to "os".
+ *
+ * If the position is beyond the number of method arguments,
+ * then it corresponds to the enum value corresponding to this EnumMethod.
+ * Otherwise, delegate to Method::print_param_use.
+ */
+void EnumMethod::print_param_use(ostream &os, int pos) const
+{
+	if (pos == num_params())
+		osprintf(os, "%s", enum_name.c_str());
+	else
+		Method::print_param_use(os, pos);
+}
+
+/* Return the number of parameters of the method
+ * (including the implicit "this").
+ *
+ * The last argument of the C function does not appear in the method call,
+ * because it is replaced by a break-up into several methods.
+ */
+int EnumMethod::num_params() const
+{
+	return Method::num_params() - 1;
 }
 
 /* Initialize a class method printer from the stream onto which the methods
