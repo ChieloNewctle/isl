@@ -16,5 +16,5 @@ if [ ! -e "$ISL_ROOT/interface/isl.py" ]; then (
     make $@ interface/isl.py
 ) fi
 
-ln -sf $(realpath $ISL_ROOT/interface/isl.py) isl.py
-ln -sf $(realpath $ISL_ROOT/.libs/libisl.so) libisl.so
+ln -sf $(realpath $ISL_ROOT/interface/isl.py) $ISL_ROOT/isl.py
+ln -sf $(realpath $ISL_ROOT/.libs/libisl.so) $ISL_ROOT/libisl.so
