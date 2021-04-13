@@ -9,7 +9,7 @@ isl = None
 try:
     if isl is None:
         libisl_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'libisl.so')
-        isl = cdll.LoadLibrary(libisl_path)
+        isl = CDLL(libisl_path, mode=os.RTLD_LOCAL | os.RTLD_DEEPBIND)
 except:
     pass
 try:
@@ -18,7 +18,11 @@ try:
 except:
     if isl is None:
         isl = cdll.LoadLibrary(find_library("isl"))
-libc = cdll.LoadLibrary(find_library("c"))
+
+if hasattr(isl, 'free'):
+    libc = isl
+else:
+    libc = cdll.LoadLibrary(find_library("c"))
 
 class Error(Exception):
     pass
