@@ -758,6 +758,16 @@ __isl_give isl_map *isl_map_set_range_tuple_id(__isl_take isl_map *map,
 	return isl_map_set_tuple_id(map, isl_dim_out, id);
 }
 
+__isl_give isl_map *isl_map_reset_domain_tuple_id(__isl_take isl_map *map)
+{
+	return isl_map_reset_tuple_id(map, isl_dim_in);
+}
+
+__isl_give isl_map *isl_map_reset_range_tuple_id(__isl_take isl_map *map)
+{
+	return isl_map_reset_tuple_id(map, isl_dim_out);
+}
+
 __isl_give isl_set *isl_set_set_tuple_id(__isl_take isl_set *set,
 	__isl_take isl_id *id)
 {
