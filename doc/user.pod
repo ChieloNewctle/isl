@@ -3634,6 +3634,10 @@ expression is known to be defined over a single universe domain.
 	isl_bool isl_pw_aff_isa_aff(__isl_keep isl_pw_aff *pa);
 	__isl_give isl_aff *isl_pw_aff_as_aff(
 		__isl_take isl_pw_aff *pa);
+	isl_bool isl_multi_pw_aff_isa_multi_aff(
+		__isl_keep isl_multi_pw_aff *mpa);
+	__isl_give isl_multi_aff *isl_multi_pw_aff_as_multi_aff(
+		__isl_take isl_multi_pw_aff *mpa);
 	isl_bool isl_pw_multi_aff_isa_multi_aff(
 		__isl_keep isl_pw_multi_aff *pma);
 	__isl_give isl_multi_aff *isl_pw_multi_aff_as_multi_aff(
@@ -9348,7 +9352,8 @@ Lists can be inspected using the following functions.
 		isl_bool (*follows)(__isl_keep isl_set *a,
 			__isl_keep isl_set *b, void *user),
 		void *follows_user,
-		isl_stat (*fn)(__isl_take isl_set *el, void *user),
+		isl_stat (*fn)(__isl_take isl_set_list *scc,
+			void *user),
 		void *fn_user);
 
 C<isl_set_list_n_set> is an alternative name for C<isl_set_list_size>.
