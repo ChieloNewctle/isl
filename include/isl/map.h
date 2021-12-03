@@ -34,6 +34,10 @@ isl_size isl_basic_map_total_dim(__isl_keep const isl_basic_map *bmap);
 isl_size isl_basic_map_dim(__isl_keep isl_basic_map *bmap,
 				enum isl_dim_type type);
 
+__isl_export
+isl_size isl_map_domain_tuple_dim(__isl_keep isl_map *map);
+__isl_export
+isl_size isl_map_range_tuple_dim(__isl_keep isl_map *map);
 isl_size isl_map_dim(__isl_keep isl_map *map, enum isl_dim_type type);
 
 isl_ctx *isl_basic_map_get_ctx(__isl_keep isl_basic_map *bmap);
@@ -680,6 +684,7 @@ __isl_give isl_map *isl_map_gist_domain(__isl_take isl_map *map,
 	__isl_take isl_set *context);
 __isl_give isl_map *isl_map_gist_range(__isl_take isl_map *map,
 	__isl_take isl_set *context);
+__isl_export
 __isl_give isl_map *isl_map_gist_params(__isl_take isl_map *map,
 	__isl_take isl_set *context);
 __isl_give isl_map *isl_map_gist_basic_map(__isl_take isl_map *map,
@@ -687,6 +692,9 @@ __isl_give isl_map *isl_map_gist_basic_map(__isl_take isl_map *map,
 
 __isl_give isl_stride_info *isl_map_get_range_stride_info(
 	__isl_keep isl_map *map, int pos);
+__isl_export
+__isl_give isl_fixed_box *isl_map_get_range_lattice_tile(
+	__isl_keep isl_map *map);
 __isl_export
 __isl_give isl_fixed_box *isl_map_get_range_simple_fixed_box_hull(
 	__isl_keep isl_map *map);
@@ -699,6 +707,7 @@ isl_bool isl_map_plain_is_equal(__isl_keep isl_map *map1,
 
 uint32_t isl_map_get_hash(__isl_keep isl_map *map);
 
+__isl_export
 isl_size isl_map_n_basic_map(__isl_keep isl_map *map);
 __isl_export
 isl_stat isl_map_foreach_basic_map(__isl_keep isl_map *map,
@@ -776,7 +785,8 @@ __isl_give isl_pw_aff *isl_map_dim_min(__isl_take isl_map *map, int pos);
 __isl_give isl_pw_aff *isl_map_dim_max(__isl_take isl_map *map, int pos);
 
 ISL_DECLARE_LIST_FN(basic_map)
-ISL_DECLARE_LIST_FN(map)
+ISL_DECLARE_EXPORTED_LIST_FN(map)
+ISL_DECLARE_EXPORTED_LIST_FN_READ(map)
 
 #if defined(__cplusplus)
 }

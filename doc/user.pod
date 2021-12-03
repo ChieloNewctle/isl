@@ -343,7 +343,7 @@ under the MIT license.
 
 The source of C<isl> can be obtained either as a tarball
 or from the git repository.  Both are available from
-L<http://isl.gforge.inria.fr/>.
+L<https://libisl.sourceforge.io/>.
 The installation process depends on how you obtained
 the source.
 
@@ -422,11 +422,11 @@ for values out of the 32 bit range. In most applications, C<isl> will run
 fastest with the C<imath-32> option, followed by C<gmp> and C<imath>, the
 slowest.
 
-=item C<--with-gmp-prefix>
+=item C<--with-gmp-prefix=>I<path>
 
 Installation prefix for C<GMP> (architecture-independent files).
 
-=item C<--with-gmp-exec-prefix>
+=item C<--with-gmp-exec-prefix=>I<path>
 
 Installation prefix for C<GMP> (architecture-dependent files).
 
@@ -436,11 +436,46 @@ Installation prefix for C<GMP> (architecture-dependent files).
 
 	make
 
-=item 4 Install (optional)
+=item 4 Test (optional)
+
+	make check
+
+=item 5 Install (optional)
 
 	make install
 
 =back
+
+=head2 Building the foreign language bindings
+
+The tarball already contains the generated foreign language bindings,
+but they are not included in the git repository.
+Building the C++ and Python bindings relies on the LLVM/clang libraries,
+see C<http://clang.llvm.org/get_started.html>.
+The C<configure> script will not assume that these are available
+on the system.
+To enable building the foreign language bindings,
+one of the following options needs to be specified.
+
+=over
+
+=item C<--with-clang=system>
+
+Use the system clang libraries (installed in a default location).
+
+=item C<--with-clang-prefix=>I<path>
+
+Use the system clang libraries installed in I<path>.
+
+=back
+
+It is best to use the latest release of the clang libraries (12.0),
+although any release since 2.9 should work as well.
+Note that if you build the clang libraries from source,
+then you need to make sure they are also installed (using C<make install>).
+If the compiler that was used to compile the clang libraries
+is different from the default C++ compiler, then use C<CXX_FOR_BUILD>
+to specify this non-default C++ compiler when running C<isl>'s C<./configure>.
 
 =head1 Integer Set Library
 
@@ -971,6 +1006,8 @@ using the following functions.
 	__isl_give isl_id *isl_id_set_free_user(
 		__isl_take isl_id *id,
 		void (*free_user)(void *user));
+	void (*isl_id_get_free_user(__isl_keep isl_id *id))
+		(void *user);
 	__isl_give isl_id *isl_id_copy(isl_id *id);
 	__isl_null isl_id *isl_id_free(__isl_take isl_id *id);
 
@@ -982,6 +1019,7 @@ using the following functions.
 
 The callback set by C<isl_id_set_free_user> is called on the user
 pointer when the last reference to the C<isl_id> is freed.
+This callback can be retrieved using C<isl_id_get_free_user>.
 Note that C<isl_id_get_name> returns a pointer to some internal
 data structure, so the result can only be used while the
 corresponding C<isl_id> is alive.
@@ -1197,6 +1235,7 @@ C<isl_dim_out> (only for relations), C<isl_dim_set>
 	#include <isl/set.h>
 	isl_size isl_basic_set_dim(__isl_keep isl_basic_set *bset,
 		enum isl_dim_type type);
+	isl_size isl_set_tuple_dim(__isl_keep isl_set *set);
 	isl_size isl_set_dim(__isl_keep isl_set *set,
 		enum isl_dim_type type);
 
@@ -1207,6 +1246,10 @@ C<isl_dim_out> (only for relations), C<isl_dim_set>
 	#include <isl/map.h>
 	isl_size isl_basic_map_dim(__isl_keep isl_basic_map *bmap,
 		enum isl_dim_type type);
+	isl_size isl_map_domain_tuple_dim(
+		__isl_keep isl_map *map);
+	isl_size isl_map_range_tuple_dim(
+		__isl_keep isl_map *map);
 	isl_size isl_map_dim(__isl_keep isl_map *map,
 		enum isl_dim_type type);
 
@@ -2871,6 +2914,9 @@ a specified dimension on a given domain can be created using
 	__isl_give isl_aff *isl_aff_param_on_domain_space_id(
 		__isl_take isl_space *space,
 		__isl_take isl_id *id);
+	__isl_give isl_aff *isl_space_param_aff_on_domain_id(
+		__isl_take isl_space *space,
+		__isl_take isl_id *id);
 	__isl_give isl_aff *isl_aff_var_on_domain(
 		__isl_take isl_local_space *ls,
 		enum isl_dim_type type, unsigned pos);
@@ -2881,6 +2927,8 @@ a specified dimension on a given domain can be created using
 
 The space passed to C<isl_aff_param_on_domain_space_id>
 is required to have a parameter with the given identifier.
+C<isl_aff_param_on_domain_space_id> and
+C<isl_space_param_aff_on_domain_id> perform the same operation.
 
 C<isl_aff_zero_on_domain_space> and C<isl_space_zero_aff_on_domain>
 perform the same operation.
@@ -3729,6 +3777,9 @@ then create a piecewise expression over a given domain.
 	__isl_give isl_pw_aff *isl_pw_aff_val_on_domain(
 		__isl_take isl_set *domain,
 		__isl_take isl_val *v);
+	__isl_give isl_pw_aff *isl_set_pw_aff_on_domain_val(
+		__isl_take isl_set *domain,
+		__isl_take isl_val *v);
 	__isl_give isl_pw_multi_aff *
 	isl_pw_multi_aff_multi_val_on_domain(
 		__isl_take isl_set *domain,
@@ -3740,9 +3791,17 @@ then create a piecewise expression over a given domain.
 	__isl_give isl_pw_aff *isl_pw_aff_param_on_domain_id(
 		__isl_take isl_set *domain,
 		__isl_take isl_id *id);
+	__isl_give isl_pw_aff *isl_set_param_pw_aff_on_domain_id(
+		__isl_take isl_set *domain,
+		__isl_take isl_id *id);
 
-C<isl_set_pw_multi_aff_on_domain_multi_val> is an alternative name
-for C<isl_pw_multi_aff_multi_val_on_domain>.
+C<isl_set_pw_aff_on_domain_val> is an alternative name
+for C<isl_pw_aff_val_on_domain>.
+Similarly for the pair
+C<isl_set_pw_multi_aff_on_domain_multi_val> and
+C<isl_pw_multi_aff_multi_val_on_domain> and
+for the pair C<isl_set_param_pw_aff_on_domain_id> and
+C<isl_pw_aff_param_on_domain_id>.
 
 As a convenience, a piecewise multiple expression can
 also be created from a piecewise expression.
@@ -4769,6 +4828,10 @@ all set dimensions.
 
 =item * Stride
 
+Stride detection is based on heuristics.
+The strides returned by the functions below are always valid,
+but there may be larger valid strides that are not detected.
+
 	isl_stat isl_set_dim_residue_class_val(
 		__isl_keep isl_set *set,
 		int pos, __isl_give isl_val **modulo,
@@ -4787,11 +4850,16 @@ can be found then assign C<1> to C<*modulo> and C<1> to C<*residue>.
 		__isl_keep isl_set *set, int pos);
 	__isl_give isl_val *isl_set_get_stride(
 		__isl_keep isl_set *set, int pos);
+	__isl_give isl_fixed_box *isl_set_get_lattice_tile(
+		__isl_keep isl_set *set);
 
 	#include <isl/map.h>
 	__isl_give isl_stride_info *
 	isl_map_get_range_stride_info(
 		__isl_keep isl_map *map, int pos);
+	__isl_give isl_fixed_box *
+	isl_map_get_range_lattice_tile(
+		__isl_keep isl_map *map);
 
 Check if the values of the given set dimension are equal to
 some affine expression of the other dimensions (the offset)
@@ -4803,6 +4871,19 @@ If no more specific information can be found, then the stride
 is taken to be one and the offset is taken to be the zero expression.
 The function C<isl_set_get_stride> performs the same
 computation as C<isl_set_get_stride_info> but only returns the stride.
+The function C<isl_map_get_range_lattice_tile> collects the stride
+information over all output dimensions.
+In particular, it returns a tile of a rectangular lattice
+(possibly of size 1 in all directions)
+containing the output in terms of the parameters and the input dimensions.
+The size and the offset of this tile correspond to
+the strides and the offsets of the stride information and
+can be extracted from the returned
+C<isl_fixed_box> using the functions described under "Box hull" in
+L</"Unary Operations">.  Note that the C<isl_fixed_box> object returned by
+C<isl_map_get_range_lattice_tile> is always valid.
+The function C<isl_set_get_lattice_tile> collects the same stride
+information over all set dimensions.
 For the other functions,
 the stride and offset can be extracted from the returned object
 using the following functions.
@@ -6499,6 +6580,10 @@ there is one, negative infinity or infinity if the problem is unbounded and
 NaN if the problem is empty.
 
 	#include <isl/ilp.h>
+	__isl_give isl_val *isl_pw_aff_min_val(
+		__isl_take isl_pw_aff *pa);
+	__isl_give isl_val *isl_pw_aff_max_val(
+		__isl_take isl_pw_aff *pa);
 	__isl_give isl_multi_val *
 	isl_pw_multi_aff_min_multi_val(
 		__isl_take isl_pw_multi_aff *pma);
@@ -9025,6 +9110,10 @@ only defined on the shared definition domain of the arguments.
 	isl_multi_aff_scale_down_multi_val(
 		__isl_take isl_multi_aff *ma,
 		__isl_take isl_multi_val *mv);
+	__isl_give isl_pw_multi_aff *
+	isl_pw_multi_aff_scale_down_multi_val(
+		__isl_take isl_pw_multi_aff *pma,
+		__isl_take isl_multi_val *mv);
 	__isl_give isl_multi_pw_aff *
 	isl_multi_pw_aff_scale_down_multi_val(
 		__isl_take isl_multi_pw_aff *mpa,
@@ -9379,6 +9468,47 @@ in isl format.
 	#include <isl/set.h>
 	__isl_give char *isl_set_list_to_str(
 		__isl_keep isl_set_list *list);
+
+An C<isl_val_list>, C<isl_id_list>,
+C<isl_aff_list>, C<isl_pw_aff_list>, C<isl_pw_multi_aff_list>,
+C<isl_union_pw_aff_list>,
+C<isl_set_list>, C<isl_map_list> or C<isl_union_set_list> object
+can also be read from input using the following functions.
+
+	#include <isl/val.h>
+	__isl_give isl_val_list *isl_val_list_read_from_str(
+		isl_ctx *ctx, const char *str);
+
+	#include <isl/id.h>
+	__isl_give isl_id_list *isl_id_list_read_from_str(
+		isl_ctx *ctx, const char *str);
+
+	#include <isl/aff.h>
+	__isl_give isl_aff_list *
+	isl_aff_list_read_from_str(isl_ctx *ctx,
+		const char *str);
+	__isl_give isl_pw_aff_list *
+	isl_pw_aff_list_read_from_str(isl_ctx *ctx,
+		const char *str);
+	__isl_give isl_pw_multi_aff_list *
+	isl_pw_multi_aff_list_read_from_str(isl_ctx *ctx,
+		const char *str);
+	__isl_give isl_union_pw_aff_list *
+	isl_union_pw_aff_list_read_from_str(isl_ctx *ctx,
+		const char *str);
+
+	#include <isl/set.h>
+	__isl_give isl_set_list *isl_set_list_read_from_str(
+		isl_ctx *ctx, const char *str);
+
+	#include <isl/map.h>
+	__isl_give isl_map_list *isl_map_list_read_from_str(
+		isl_ctx *ctx, const char *str);
+
+	#include <isl/union_set.h>
+	__isl_give isl_union_set_list *
+	isl_union_set_list_read_from_str(isl_ctx *ctx,
+		const char *str);
 
 =head2 Associative arrays
 

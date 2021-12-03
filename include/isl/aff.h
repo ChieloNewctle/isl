@@ -32,6 +32,9 @@ __isl_give isl_aff *isl_aff_nan_on_domain_space(__isl_take isl_space *space);
 __isl_give isl_aff *isl_aff_nan_on_domain(__isl_take isl_local_space *ls);
 __isl_give isl_aff *isl_aff_param_on_domain_space_id(
 	__isl_take isl_space *space, __isl_take isl_id *id);
+__isl_overload
+__isl_give isl_aff *isl_space_param_aff_on_domain_id(
+	__isl_take isl_space *space, __isl_take isl_id *id);
 
 __isl_give isl_aff *isl_aff_copy(__isl_keep isl_aff *aff);
 __isl_null isl_aff *isl_aff_free(__isl_take isl_aff *aff);
@@ -210,6 +213,7 @@ void isl_aff_dump(__isl_keep isl_aff *aff);
 isl_ctx *isl_pw_aff_get_ctx(__isl_keep isl_pw_aff *pwaff);
 uint32_t isl_pw_aff_get_hash(__isl_keep isl_pw_aff *pa);
 __isl_give isl_space *isl_pw_aff_get_domain_space(__isl_keep isl_pw_aff *pwaff);
+__isl_export
 __isl_give isl_space *isl_pw_aff_get_space(__isl_keep isl_pw_aff *pwaff);
 
 __isl_constructor
@@ -227,7 +231,13 @@ __isl_give isl_pw_aff *isl_pw_aff_nan_on_domain(__isl_take isl_local_space *ls);
 __isl_give isl_pw_aff *isl_pw_aff_val_on_domain(__isl_take isl_set *domain,
 	__isl_take isl_val *v);
 __isl_overload
+__isl_give isl_pw_aff *isl_set_pw_aff_on_domain_val(__isl_take isl_set *domain,
+	__isl_take isl_val *v);
+__isl_overload
 __isl_give isl_pw_aff *isl_pw_aff_param_on_domain_id(
+	__isl_take isl_set *domain, __isl_take isl_id *id);
+__isl_overload
+__isl_give isl_pw_aff *isl_set_param_pw_aff_on_domain_id(
 	__isl_take isl_set *domain, __isl_take isl_id *id);
 
 __isl_export
@@ -743,7 +753,11 @@ __isl_give isl_pw_multi_aff *isl_pw_multi_aff_scale_val(
 __isl_overload
 __isl_give isl_pw_multi_aff *isl_pw_multi_aff_scale_down_val(
 	__isl_take isl_pw_multi_aff *pma, __isl_take isl_val *v);
+__isl_overload
 __isl_give isl_pw_multi_aff *isl_pw_multi_aff_scale_multi_val(
+	__isl_take isl_pw_multi_aff *pma, __isl_take isl_multi_val *mv);
+__isl_overload
+__isl_give isl_pw_multi_aff *isl_pw_multi_aff_scale_down_multi_val(
 	__isl_take isl_pw_multi_aff *pma, __isl_take isl_multi_val *mv);
 
 __isl_give isl_pw_multi_aff *isl_pw_multi_aff_union_lexmin(
@@ -911,6 +925,7 @@ isl_ctx *isl_union_pw_multi_aff_get_ctx(
 __isl_export
 __isl_give isl_space *isl_union_pw_multi_aff_get_space(
 	__isl_keep isl_union_pw_multi_aff *upma);
+__isl_export
 __isl_give isl_pw_multi_aff_list *isl_union_pw_multi_aff_get_pw_multi_aff_list(
 	__isl_keep isl_union_pw_multi_aff *upma);
 
@@ -1477,9 +1492,13 @@ __isl_give isl_printer *isl_printer_print_multi_union_pw_aff(
 void isl_multi_union_pw_aff_dump(__isl_keep isl_multi_union_pw_aff *mupa);
 
 ISL_DECLARE_EXPORTED_LIST_FN(aff)
+ISL_DECLARE_EXPORTED_LIST_FN_READ(aff)
 ISL_DECLARE_EXPORTED_LIST_FN(pw_aff)
+ISL_DECLARE_EXPORTED_LIST_FN_READ(pw_aff)
 ISL_DECLARE_EXPORTED_LIST_FN(pw_multi_aff)
+ISL_DECLARE_EXPORTED_LIST_FN_READ(pw_multi_aff)
 ISL_DECLARE_EXPORTED_LIST_FN(union_pw_aff)
+ISL_DECLARE_EXPORTED_LIST_FN_READ(union_pw_aff)
 ISL_DECLARE_LIST_FN(union_pw_multi_aff)
 
 #if defined(__cplusplus)
