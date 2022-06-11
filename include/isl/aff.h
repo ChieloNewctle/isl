@@ -335,6 +335,7 @@ __isl_export
 __isl_give isl_pw_aff *isl_pw_aff_ceil(__isl_take isl_pw_aff *pwaff);
 __isl_export
 __isl_give isl_pw_aff *isl_pw_aff_floor(__isl_take isl_pw_aff *pwaff);
+__isl_export
 __isl_overload
 __isl_give isl_pw_aff *isl_pw_aff_mod_val(__isl_take isl_pw_aff *pa,
 	__isl_take isl_val *mod);
@@ -1313,13 +1314,17 @@ __isl_give isl_union_pw_aff *isl_union_pw_aff_pullback_union_pw_multi_aff(
 	__isl_take isl_union_pw_aff *upa,
 	__isl_take isl_union_pw_multi_aff *upma);
 
+__isl_export
 __isl_give isl_union_pw_aff *isl_union_pw_aff_floor(
 	__isl_take isl_union_pw_aff *upa);
 
+__isl_export
 __isl_give isl_union_pw_aff *isl_union_pw_aff_scale_val(
 	__isl_take isl_union_pw_aff *upa, __isl_take isl_val *v);
+__isl_export
 __isl_give isl_union_pw_aff *isl_union_pw_aff_scale_down_val(
 	__isl_take isl_union_pw_aff *upa, __isl_take isl_val *v);
+__isl_export
 __isl_give isl_union_pw_aff *isl_union_pw_aff_mod_val(
 	__isl_take isl_union_pw_aff *upa, __isl_take isl_val *f);
 
@@ -1401,6 +1406,7 @@ __isl_give isl_multi_union_pw_aff *
 isl_multi_union_pw_aff_pw_multi_aff_on_domain(__isl_take isl_union_set *domain,
 	__isl_take isl_pw_multi_aff *pma);
 
+__isl_export
 __isl_give isl_multi_union_pw_aff *isl_multi_union_pw_aff_floor(
 	__isl_take isl_multi_union_pw_aff *mupa);
 
@@ -1411,6 +1417,7 @@ __isl_give isl_multi_union_pw_aff *isl_multi_union_pw_aff_intersect_domain(
 __isl_export
 __isl_give isl_multi_union_pw_aff *isl_multi_union_pw_aff_intersect_params(
 	__isl_take isl_multi_union_pw_aff *mupa, __isl_take isl_set *params);
+__isl_export
 __isl_give isl_multi_union_pw_aff *isl_multi_union_pw_aff_intersect_range(
 	__isl_take isl_multi_union_pw_aff *mupa, __isl_take isl_set *set);
 

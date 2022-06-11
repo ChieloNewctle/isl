@@ -90,6 +90,7 @@ __isl_give isl_ast_expr *isl_ast_expr_get_op_arg(__isl_keep isl_ast_expr *expr,
 __isl_give isl_ast_expr *isl_ast_expr_set_op_arg(__isl_take isl_ast_expr *expr,
 	int pos, __isl_take isl_ast_expr *arg);
 
+__isl_export
 isl_bool isl_ast_expr_is_equal(__isl_keep isl_ast_expr *expr1,
 	__isl_keep isl_ast_expr *expr2);
 
@@ -111,8 +112,10 @@ isl_ctx *isl_ast_node_get_ctx(__isl_keep isl_ast_node *node);
 __isl_subclass(isl_ast_node)
 enum isl_ast_node_type isl_ast_node_get_type(__isl_keep isl_ast_node *node);
 
+__isl_export
 __isl_give isl_ast_node *isl_ast_node_set_annotation(
 	__isl_take isl_ast_node *node, __isl_take isl_id *annotation);
+__isl_export
 __isl_give isl_id *isl_ast_node_get_annotation(__isl_keep isl_ast_node *node);
 
 __isl_export

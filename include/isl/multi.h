@@ -54,6 +54,7 @@ __isl_give isl_multi_##BASE *isl_multi_##BASE##_set_##BASE(		\
 __isl_give isl_multi_##BASE *isl_multi_##BASE##_range_splice(		\
 	__isl_take isl_multi_##BASE *multi1, unsigned pos,		\
 	__isl_take isl_multi_##BASE *multi2);				\
+__isl_export								\
 __isl_give isl_multi_##BASE *isl_multi_##BASE##_flatten_range(		\
 	__isl_take isl_multi_##BASE *multi);				\
 __isl_export								\
@@ -64,17 +65,23 @@ __isl_export								\
 __isl_give isl_multi_##BASE *isl_multi_##BASE##_range_product(		\
 	__isl_take isl_multi_##BASE *multi1,				\
 	__isl_take isl_multi_##BASE *multi2);				\
+__isl_export								\
 __isl_give isl_multi_##BASE *isl_multi_##BASE##_factor_range(		\
 	__isl_take isl_multi_##BASE *multi);				\
+__isl_export								\
 isl_bool isl_multi_##BASE##_range_is_wrapping(				\
 	__isl_keep isl_multi_##BASE *multi);				\
+__isl_export								\
 __isl_give isl_multi_##BASE *isl_multi_##BASE##_range_factor_domain(	\
 	__isl_take isl_multi_##BASE *multi);				\
+__isl_export								\
 __isl_give isl_multi_##BASE *isl_multi_##BASE##_range_factor_range(	\
 	__isl_take isl_multi_##BASE *multi);				\
+__isl_export								\
 __isl_give isl_multi_##BASE *isl_multi_##BASE##_align_params(		\
 	__isl_take isl_multi_##BASE *multi,				\
 	__isl_take isl_space *model);					\
+__isl_export								\
 __isl_give isl_multi_##BASE *isl_multi_##BASE##_from_range(		\
 	__isl_take isl_multi_##BASE *multi);
 
@@ -99,19 +106,24 @@ int isl_multi_##BASE##_plain_cmp(__isl_keep isl_multi_##BASE *multi1,	\
 
 #define ISL_DECLARE_MULTI_ARITH(BASE)					\
 __isl_overload								\
+__isl_export								\
 __isl_give isl_multi_##BASE *isl_multi_##BASE##_scale_val(		\
 	__isl_take isl_multi_##BASE *multi, __isl_take isl_val *v);	\
 __isl_overload								\
+__isl_export								\
 __isl_give isl_multi_##BASE *isl_multi_##BASE##_scale_down_val(		\
 	__isl_take isl_multi_##BASE *multi, __isl_take isl_val *v);	\
 __isl_overload								\
+__isl_export								\
 __isl_give isl_multi_##BASE *isl_multi_##BASE##_scale_multi_val(	\
 	__isl_take isl_multi_##BASE *multi,				\
 	__isl_take isl_multi_val *mv);					\
 __isl_overload								\
+__isl_export								\
 __isl_give isl_multi_##BASE *isl_multi_##BASE##_scale_down_multi_val(	\
 	__isl_take isl_multi_##BASE *multi,				\
 	__isl_take isl_multi_val *mv);					\
+__isl_export								\
 __isl_give isl_multi_##BASE *isl_multi_##BASE##_mod_multi_val(		\
 	__isl_take isl_multi_##BASE *multi,				\
 	__isl_take isl_multi_val *mv);					\
@@ -139,9 +151,11 @@ __isl_give isl_multi_##BASE *isl_multi_##BASE##_max(			\
 
 #define ISL_DECLARE_MULTI_ADD_CONSTANT(BASE)				\
 __isl_overload								\
+__isl_export								\
 __isl_give isl_multi_##BASE *isl_multi_##BASE##_add_constant_val(	\
 	__isl_take isl_multi_##BASE *mpa, __isl_take isl_val *v);	\
 __isl_overload								\
+__isl_export								\
 __isl_give isl_multi_##BASE *isl_multi_##BASE##_add_constant_multi_val(	\
 	__isl_take isl_multi_##BASE *mpa, __isl_take isl_multi_val *mv);
 
@@ -223,6 +237,7 @@ __isl_give isl_id *isl_multi_##BASE##_get_tuple_id(			\
 __isl_give isl_multi_##BASE *isl_multi_##BASE##_set_tuple_name(		\
 	__isl_take isl_multi_##BASE *multi,				\
 	enum isl_dim_type type, const char *s);				\
+__isl_export								\
 __isl_overload								\
 __isl_give isl_multi_##BASE *isl_multi_##BASE##_set_range_tuple_id(	\
 	__isl_take isl_multi_##BASE *multi,  __isl_take isl_id *id);	\
