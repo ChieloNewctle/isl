@@ -167,6 +167,12 @@ __isl_export
 __isl_give isl_ast_node *isl_ast_build_ast_from_schedule(
 	__isl_keep isl_ast_build *build, __isl_take isl_union_map *schedule);
 
+__isl_export
+isl_bool isl_ast_build_has_schedule_node(__isl_keep isl_ast_build *build);
+__isl_export
+__isl_give isl_schedule_node *isl_ast_build_get_schedule_node(
+	__isl_keep isl_ast_build *build);
+
 #if defined(__cplusplus)
 }
 #endif

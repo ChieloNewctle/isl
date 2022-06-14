@@ -117,6 +117,8 @@ __isl_give isl_ast_node *isl_ast_node_set_annotation(
 	__isl_take isl_ast_node *node, __isl_take isl_id *annotation);
 __isl_export
 __isl_give isl_id *isl_ast_node_get_annotation(__isl_keep isl_ast_node *node);
+__isl_export
+isl_bool isl_ast_node_has_annotation(__isl_keep isl_ast_node *node);
 
 __isl_export
 __isl_give isl_ast_expr *isl_ast_node_for_get_iterator(

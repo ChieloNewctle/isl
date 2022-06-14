@@ -1407,6 +1407,13 @@ __isl_give isl_id *isl_ast_node_get_annotation(__isl_keep isl_ast_node *node)
 	return node ? isl_id_copy(node->annotation) : NULL;
 }
 
+isl_bool isl_ast_node_has_annotation(__isl_keep isl_ast_node *node)
+{
+	if (!node)
+		return isl_bool_error;
+	return node->annotation != NULL;
+}
+
 /* Replace node->annotation by "annotation".
  */
 __isl_give isl_ast_node *isl_ast_node_set_annotation(

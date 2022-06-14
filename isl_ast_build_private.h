@@ -237,9 +237,6 @@ __isl_give isl_ast_build *isl_ast_build_restrict_generated(
 __isl_give isl_ast_build *isl_ast_build_replace_pending_by_guard(
 	__isl_take isl_ast_build *build, __isl_take isl_set *guard);
 
-int isl_ast_build_has_schedule_node(__isl_keep isl_ast_build *build);
-__isl_give isl_schedule_node *isl_ast_build_get_schedule_node(
-	__isl_keep isl_ast_build *build);
 __isl_give isl_ast_build *isl_ast_build_set_schedule_node(
 	__isl_take isl_ast_build *build,
 	__isl_take isl_schedule_node *node);
