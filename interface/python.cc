@@ -325,7 +325,7 @@ void python_generator::print_arg_in_call(FunctionDecl *fd, const char *fmt,
 static void print_rethrow(int indent, const char *exc_info)
 {
 	print_indent(indent,
-			"    %s = typing.cast(typing.Optional[BaseException], %s)\n",
+			"%s = typing.cast(typing.Optional[BaseException], %s)\n",
 			exc_info, exc_info);
 	print_indent(indent, "if %s is not None:\n", exc_info);
 	print_indent(indent, "    raise Error from %s\n", exc_info);
