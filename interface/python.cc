@@ -236,6 +236,7 @@ void python_generator::print_callback(ParmVarDecl *param, int arg)
 		printf("cb_arg%d", i);
 	}
 	printf("):\n");
+	printf("            nonlocal exc_info\n");
 	for (unsigned i = 0; i < n_arg - 1; ++i) {
 		string arg_type;
 		arg_type = type2python(extract_type(fn->getArgType(i)));
@@ -257,7 +258,6 @@ void python_generator::print_callback(ParmVarDecl *param, int arg)
 	}
 	printf(")\n");
 	printf("            except BaseException as e:\n");
-	printf("                nonlocal exc_info\n");
 	printf("                exc_info = e\n");
 	if (is_isl_stat(return_type) || is_isl_bool(return_type))
 		printf("                return -1\n");
@@ -324,8 +324,9 @@ void python_generator::print_arg_in_call(FunctionDecl *fd, const char *fmt,
  */
 static void print_rethrow(int indent, const char *exc_info)
 {
+	print_indent(indent, "    %s = typing.cast(typing.Optional[BaseException], %s)\n", exc_info);
 	print_indent(indent, "if %s is not None:\n", exc_info);
-	print_indent(indent, "    raise %s\n", exc_info);
+	print_indent(indent, "    raise Error from %s\n", exc_info);
 }
 
 /* Print code with the given indentation that checks
