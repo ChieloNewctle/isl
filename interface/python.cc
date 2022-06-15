@@ -1,18 +1,18 @@
 /*
  * Copyright 2011,2015 Sven Verdoolaege. All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
- * 
+ *
  *    1. Redistributions of source code must retain the above copyright
  *       notice, this list of conditions and the following disclaimer.
- * 
+ *
  *    2. Redistributions in binary form must reproduce the above
  *       copyright notice, this list of conditions and the following
  *       disclaimer in the documentation and/or other materials provided
  *       with the distribution.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY SVEN VERDOOLAEGE ''AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
@@ -24,12 +24,12 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- * 
+ *
  * The views and conclusions contained in the software and documentation
  * are those of the authors and should not be interpreted as
  * representing official policies, either expressed or implied, of
  * Sven Verdoolaege.
- */ 
+ */
 
 #include "isl_config.h"
 
@@ -348,13 +348,13 @@ static void print_persistent_callback_failure_check(int indent,
 		printf(fmt, 0);
 		printf(", '%s') and ", callback_name.c_str());
 		printf(fmt, 0);
-		printf(".%s['exc_info'] is not None:\n", callback_name.c_str());
+		printf(".%s['exc_info']() is not None:\n", callback_name.c_str());
 		print_indent(indent, "    exc_info = ");
 		printf(fmt, 0);
-		printf(".%s['exc_info']\n", callback_name.c_str());
+		printf(".%s['exc_info']()\n", callback_name.c_str());
 		print_indent(indent, "    ");
 		printf(fmt, 0);
-		printf(".%s['exc_info'] = None\n", callback_name.c_str());
+		printf(".%s['exc_info'].__closure__[0].cell_contents = None\n", callback_name.c_str());
 		print_rethrow(indent + 4, "exc_info");
 	}
 }
@@ -409,7 +409,7 @@ void python_generator::print_method_return(int indent, const isl_class &clazz,
 
 			callback_name = clazz.persistent_callback_name(method);
 			print_indent(indent, "obj.%s = { 'func': cb1, "
-				"'exc_info': exc_info }\n",
+				"'exc_info': lambda: exc_info }\n",
 				callback_name.c_str());
 		}
 		print_indent(indent, "return obj\n");
