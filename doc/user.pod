@@ -469,7 +469,7 @@ Use the system clang libraries installed in I<path>.
 
 =back
 
-It is best to use the latest release of the clang libraries (12.0),
+It is best to use the latest release of the clang libraries (14.0),
 although any release since 2.9 should work as well.
 Note that if you build the clang libraries from source,
 then you need to make sure they are also installed (using C<make install>).
@@ -4347,6 +4347,10 @@ Objects can be read from input using the following functions.
 	__isl_give isl_val *isl_val_read_from_str(isl_ctx *ctx,
 		const char *str);
 	__isl_give isl_multi_val *isl_multi_val_read_from_str(
+		isl_ctx *ctx, const char *str);
+
+	#include <isl/space.h>
+	__isl_give isl_space *isl_space_read_from_str(
 		isl_ctx *ctx, const char *str);
 
 	#include <isl/set.h>
@@ -11851,6 +11855,10 @@ representing the array being accessed.
 A member access.
 This operation has two arguments, a structure and the name of
 the member of the structure being accessed.
+
+=item C<isl_ast_expr_op_address_of>
+
+The address of its single argument, which is always an array access.
 
 =back
 

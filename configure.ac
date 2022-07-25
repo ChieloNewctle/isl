@@ -1,10 +1,10 @@
-AC_INIT([isl], [0.24], [isl-development@googlegroups.com])
+AC_INIT([isl], [0.25], [isl-development@googlegroups.com])
 AC_CONFIG_AUX_DIR([.])
 AC_CONFIG_MACRO_DIR([m4])
 AM_INIT_AUTOMAKE([foreign])
 m4_ifdef([AM_SILENT_RULES],[AM_SILENT_RULES([yes])])
 AC_SUBST(versioninfo)
-versioninfo=24:0:1
+versioninfo=25:0:2
 
 if test "x$prefix" != "xNONE"; then
 	prefix_wd=`cd $prefix && pwd`
@@ -30,7 +30,7 @@ AX_CXX_COMPILE_STDCXX_11_NO_OVERRIDE
 AX_CXX_COMPILE_STDCXX_17([], [optional])
 
 AC_PROG_GREP
-AC_PROG_LIBTOOL
+LT_INIT
 AC_PROG_SED
 AM_PATH_PYTHON([3.6], [], [:])
 AM_CONDITIONAL([HAVE_PYTHON], [test "$PYTHON" != :])
