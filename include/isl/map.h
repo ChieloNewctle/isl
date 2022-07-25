@@ -729,12 +729,16 @@ __isl_give isl_map *isl_map_reaching_path_lengths(__isl_take isl_map *map,
 __isl_give isl_map *isl_map_transitive_closure(__isl_take isl_map *map,
 	isl_bool *exact);
 
+__isl_export
 __isl_give isl_map *isl_map_lex_le_map(__isl_take isl_map *map1,
 	__isl_take isl_map *map2);
+__isl_export
 __isl_give isl_map *isl_map_lex_lt_map(__isl_take isl_map *map1,
 	__isl_take isl_map *map2);
+__isl_export
 __isl_give isl_map *isl_map_lex_ge_map(__isl_take isl_map *map1,
 	__isl_take isl_map *map2);
+__isl_export
 __isl_give isl_map *isl_map_lex_gt_map(__isl_take isl_map *map1,
 	__isl_take isl_map *map2);
 
