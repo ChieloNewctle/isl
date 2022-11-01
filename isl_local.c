@@ -265,19 +265,13 @@ __isl_give isl_local *isl_local_reorder(__isl_take isl_local *local,
 {
 	isl_mat *div = local;
 	int i, j;
-	isl_size dim;
-	isl_space *space;
 	isl_mat *mat;
 	int extra;
 
 	if (!local || !r)
 		goto error;
 
-	space = isl_reordering_peek_space(r);
-	dim = isl_space_dim(space, isl_dim_all);
-	if (dim < 0)
-		goto error;
-	extra = dim + div->n_row - r->len;
+	extra = r->dst_len - r->src_len;
 	mat = isl_mat_alloc(div->ctx, div->n_row, div->n_col + extra);
 	if (!mat)
 		goto error;
@@ -285,7 +279,7 @@ __isl_give isl_local *isl_local_reorder(__isl_take isl_local *local,
 	for (i = 0; i < div->n_row; ++i) {
 		isl_seq_cpy(mat->row[i], div->row[i], 2);
 		isl_seq_clr(mat->row[i] + 2, mat->n_col - 2);
-		for (j = 0; j < r->len; ++j)
+		for (j = 0; j < r->src_len; ++j)
 			isl_int_set(mat->row[i][2 + r->pos[j]],
 				    div->row[i][2 + j]);
 	}
