@@ -985,6 +985,7 @@ static const std::unordered_map<std::string, std::vector<Kind>> base_kinds {
 	{ "fixed_box",	{ set_type, map_type } },
 	{ "val",	{ set_anon } },
 	{ "id",		{ set_anon } },
+	{ "constraint",	{ set_anon } },
 };
 
 /* Prefixes introduced by type constructors.

@@ -2,6 +2,7 @@
 #include <isl/space.h>
 #include <isl/val.h>
 #include <isl/aff.h>
+#include <isl/constraint.h>
 #include <isl/set.h>
 #include <isl/map.h>
 #include <isl/ilp.h>

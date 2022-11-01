@@ -1271,7 +1271,8 @@ __isl_give isl_aff *isl_constraint_get_aff(
  *
  * The denominator of "aff" can be ignored.
  */
-static __isl_give isl_constraint *isl_constraint_alloc_aff(int eq,
+__isl_constructor
+__isl_give isl_constraint *isl_constraint_alloc_aff(int eq,
 	__isl_take isl_aff *aff)
 {
 	isl_local_space *ls;
@@ -1293,6 +1294,11 @@ __isl_give isl_constraint *isl_equality_from_aff(__isl_take isl_aff *aff)
 {
 	return isl_constraint_alloc_aff(1, aff);
 }
+__isl_export
+__isl_give isl_constraint *isl_constraint_equality_from_aff(__isl_take isl_aff *aff)
+{
+	return isl_equality_from_aff(aff);
+}
 
 /* Construct an inequality constraint enforcing the given affine expression
  * to be non-negative.
@@ -1300,6 +1306,11 @@ __isl_give isl_constraint *isl_equality_from_aff(__isl_take isl_aff *aff)
 __isl_give isl_constraint *isl_inequality_from_aff(__isl_take isl_aff *aff)
 {
 	return isl_constraint_alloc_aff(0, aff);
+}
+__isl_export
+__isl_give isl_constraint *isl_constraint_inequality_from_aff(__isl_take isl_aff *aff)
+{
+	return isl_inequality_from_aff(aff);
 }
 
 /* Compare two isl_constraints.
