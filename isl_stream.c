@@ -101,6 +101,15 @@ __isl_give isl_val *isl_token_get_val(isl_ctx *ctx, struct isl_token *tok)
 	return isl_val_int_from_isl_int(ctx, tok->u.v);
 }
 
+/* Does the given token have a string representation?
+ */
+isl_bool isl_token_has_str(struct isl_token *tok)
+{
+	if (!tok)
+		return isl_bool_error;
+	return isl_bool_ok(tok->u.s != NULL);
+}
+
 /* Given a token with a string representation, return a copy of this string.
  */
 __isl_give char *isl_token_get_str(isl_ctx *ctx, struct isl_token *tok)
@@ -446,15 +455,13 @@ static struct isl_token *next_token(__isl_keep isl_stream *s, int same_line)
 		}
 		if (c != -1)
 			isl_stream_ungetc(s, c);
-		if (!isdigit(c)) {
-			tok = isl_token_new(s->ctx, line, col, old_line != line);
-			if (!tok)
-				return NULL;
-			tok->type = (enum isl_token_type) '-';
-			return tok;
-		}
+		tok = isl_token_new(s->ctx, line, col, old_line != line);
+		if (!tok)
+			return NULL;
+		tok->type = (enum isl_token_type) '-';
+		return tok;
 	}
-	if (c == '-' || isdigit(c)) {
+	if (isdigit(c)) {
 		int minus = c == '-';
 		tok = isl_token_new(s->ctx, line, col, old_line != line);
 		if (!tok)

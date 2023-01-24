@@ -444,6 +444,24 @@ struct {
 	  "{ [x, floor(x/4)] }" },
 	{ "{ [10//4] }",
 	  "{ [2] }" },
+	{ "{ [-1//4] }",
+	  "{ [-1] }" },
+	{ "{ [0-1//4] }",
+	  "{ [0] }" },
+	{ "{ [- 1//4] }",
+	  "{ [-1] }" },
+	{ "{ [0 - 1//4] }",
+	  "{ [0] }" },
+	{ "{ [0--1//4] }",
+	  "{ [1] }" },
+	{ "{ [0 - -1//4] }",
+	  "{ [1] }" },
+	{ "{ [-2^2:2^2-1] }",
+	  "{ [-4:3] }" },
+	{ "{ [2*-2] }",
+	  "{ [-4] }" },
+	{ "{ [i,i*-2] }",
+	  "{ [i,-2i] }" },
 	{ "[a, b, c, d] -> { [max(a,b,c,d)] }",
 	  "[a, b, c, d] -> { [a] : b < a and c < a and d < a; "
 		"[b] : b >= a and c < b and d < b; "
@@ -8904,25 +8922,6 @@ static int test_empty_projection(isl_ctx *ctx)
 	return 0;
 }
 
-int test_fixed_power(isl_ctx *ctx)
-{
-	const char *str;
-	isl_map *map;
-	isl_val *exp;
-	int equal;
-
-	str = "{ [i] -> [i + 1] }";
-	map = isl_map_read_from_str(ctx, str);
-	exp = isl_val_int_from_si(ctx, 23);
-	map = isl_map_fixed_power_val(map, exp);
-	equal = map_check_equal(map, "{ [i] -> [i + 23] }");
-	isl_map_free(map);
-	if (equal < 0)
-		return -1;
-
-	return 0;
-}
-
 int test_slice(isl_ctx *ctx)
 {
 	const char *str;
@@ -9689,14 +9688,58 @@ static __isl_give isl_ast_node *after_for(__isl_take isl_ast_node *node,
 	return node;
 }
 
+/* This function is called after node in the AST generated
+ * from test_ast_gen1.
+ *
+ * Increment the count in "user" if this is a for node and
+ * return true to indicate that descendant should also be visited.
+ */
+static isl_bool count_for(__isl_keep isl_ast_node *node, void *user)
+{
+	int *count = user;
+
+	if (isl_ast_node_get_type(node) == isl_ast_node_for)
+		++*count;
+
+	return isl_bool_true;
+}
+
+/* If "node" is a block node, then replace it by its first child.
+ */
+static __isl_give isl_ast_node *select_first(__isl_take isl_ast_node *node,
+	void *user)
+{
+	isl_ast_node_list *children;
+	isl_ast_node *child;
+
+	if (isl_ast_node_get_type(node) != isl_ast_node_block)
+		return node;
+
+	children = isl_ast_node_block_get_children(node);
+	child = isl_ast_node_list_get_at(children, 0);
+	isl_ast_node_list_free(children);
+	isl_ast_node_free(node);
+
+	return child;
+}
+
 /* Check that the before_each_for and after_each_for callbacks
  * are called for each for loop in the generated code,
  * that they are called in the right order and that the isl_id
  * returned from the before_each_for callback is attached to
  * the isl_ast_node passed to the corresponding after_each_for call.
+ *
+ * Additionally, check the basic functionality of
+ * isl_ast_node_foreach_descendant_top_down by counting the number
+ * of for loops in the resulting AST,
+ * as well as that of isl_ast_node_map_descendant_bottom_up
+ * by replacing the block node by its first child and
+ * counting the number of for loops again.
  */
-static int test_ast_gen1(isl_ctx *ctx)
+static isl_stat test_ast_gen1(isl_ctx *ctx)
 {
+	int count = 0;
+	int modified_count = 0;
 	const char *str;
 	isl_set *set;
 	isl_union_map *schedule;
@@ -9720,16 +9763,33 @@ static int test_ast_gen1(isl_ctx *ctx)
 			&after_for, &data);
 	tree = isl_ast_build_node_from_schedule_map(build, schedule);
 	isl_ast_build_free(build);
+
+	if (isl_ast_node_foreach_descendant_top_down(tree,
+							&count_for, &count) < 0)
+		tree = isl_ast_node_free(tree);
+
+	tree = isl_ast_node_map_descendant_bottom_up(tree, &select_first, NULL);
+
+	if (isl_ast_node_foreach_descendant_top_down(tree, &count_for,
+							&modified_count) < 0)
+		tree = isl_ast_node_free(tree);
+
 	if (!tree)
-		return -1;
+		return isl_stat_error;
 
 	isl_ast_node_free(tree);
 
-	if (data.before != 3 || data.after != 3)
+	if (data.before != 3 || data.after != 3 || count != 3)
 		isl_die(ctx, isl_error_unknown,
-			"unexpected number of for nodes", return -1);
+			"unexpected number of for nodes",
+			return isl_stat_error);
 
-	return 0;
+	if (modified_count != 2)
+		isl_die(ctx, isl_error_unknown,
+			"unexpected number of for nodes after changes",
+			return isl_stat_error);
+
+	return isl_stat_ok;
 }
 
 /* Check that the AST generator handles domains that are integrally disjoint
@@ -10902,7 +10962,6 @@ struct {
 	{ "residue class", &test_residue_class },
 	{ "div", &test_div },
 	{ "slice", &test_slice },
-	{ "fixed power", &test_fixed_power },
 	{ "sample", &test_sample },
 	{ "empty projection", &test_empty_projection },
 	{ "output", &test_output },

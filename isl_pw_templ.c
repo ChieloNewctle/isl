@@ -57,7 +57,7 @@ __isl_give PW *FN(PW,ZERO)(__isl_take isl_space *space OPT_TYPE_PARAM)
  * Do this independently of the values of "set" and "el",
  * such that this function can be used by isl_pw_*_dup.
  */
-__isl_give PW *FN(PW,add_dup_piece)(__isl_take PW *pw,
+static __isl_give PW *FN(PW,add_dup_piece)(__isl_take PW *pw,
 	__isl_take isl_set *set, __isl_take EL *el)
 {
 	isl_ctx *ctx;
@@ -243,7 +243,7 @@ __isl_give isl_space *FN(PW,get_space)(__isl_keep PW *pw)
  * a subsequent call to isl_pw_*_restore_*.
  * The only exception is that isl_pw_*_free can be called instead.
  */
-__isl_give isl_space *FN(PW,take_space)(__isl_keep PW *pw)
+static __isl_give isl_space *FN(PW,take_space)(__isl_keep PW *pw)
 {
 	isl_space *space;
 
@@ -261,7 +261,7 @@ __isl_give isl_space *FN(PW,take_space)(__isl_keep PW *pw)
  * However, in this case, "pw" only has a single reference and
  * then the call to isl_pw_*_cow has no effect.
  */
-__isl_give PW *FN(PW,restore_space)(__isl_take PW *pw,
+static __isl_give PW *FN(PW,restore_space)(__isl_take PW *pw,
 	__isl_take isl_space *space)
 {
 	if (!pw || !space)
@@ -308,7 +308,7 @@ static __isl_keep isl_set *FN(PW,peek_domain_at)(__isl_keep PW *pw, int pos)
 
 /* Return a copy of the cell at position "pos" in "pw".
  */
-__isl_give isl_set *FN(PW,get_domain_at)(__isl_keep PW *pw, int pos)
+static __isl_give isl_set *FN(PW,get_domain_at)(__isl_keep PW *pw, int pos)
 {
 	return isl_set_copy(FN(PW,peek_domain_at)(pw, pos));
 }
@@ -371,7 +371,7 @@ error:
 /* Return the base expression associated to
  * the cell at position "pos" in "pw".
  */
-static __isl_keep EL *FN(PW,peek_base_at)(__isl_keep PW *pw, int pos)
+__isl_keep EL *FN(PW,peek_base_at)(__isl_keep PW *pw, int pos)
 {
 	if (FN(PW,check_pos)(pw, pos) < 0)
 		return NULL;
@@ -381,7 +381,7 @@ static __isl_keep EL *FN(PW,peek_base_at)(__isl_keep PW *pw, int pos)
 /* Return a copy of the base expression associated to
  * the cell at position "pos" in "pw".
  */
-__isl_give EL *FN(PW,get_base_at)(__isl_keep PW *pw, int pos)
+static __isl_give EL *FN(PW,get_base_at)(__isl_keep PW *pw, int pos)
 {
 	return FN(EL,copy)(FN(PW,peek_base_at)(pw, pos));
 }
@@ -397,7 +397,7 @@ __isl_give EL *FN(PW,get_base_at)(__isl_keep PW *pw, int pos)
  * a subsequent call to isl_pw_*_restore_*.
  * The only exception is that isl_pw_*_free can be called instead.
  */
-__isl_give EL *FN(PW,take_base_at)(__isl_keep PW *pw, int pos)
+static __isl_give EL *FN(PW,take_base_at)(__isl_keep PW *pw, int pos)
 {
 	EL *el;
 
@@ -452,7 +452,7 @@ error:
  * where this base expression may be missing
  * due to a preceding call to isl_pw_*_take_base_at.
  */
-__isl_give PW *FN(PW,restore_base_at)(__isl_take PW *pw, int pos,
+static __isl_give PW *FN(PW,restore_base_at)(__isl_take PW *pw, int pos,
 	__isl_take EL *el)
 {
 	return FN(PW,restore_base_at_)(pw, pos, el, 0);
@@ -576,7 +576,7 @@ isl_bool FN(PW,IS_ZERO)(__isl_keep PW *pw)
 	return isl_bool_ok(pw->n == 0);
 }
 
-__isl_give PW *FN(PW,realign_domain)(__isl_take PW *pw,
+static __isl_give PW *FN(PW,realign_domain)(__isl_take PW *pw,
 	__isl_take isl_reordering *exp)
 {
 	int i;
@@ -748,86 +748,22 @@ error:
 	return NULL;
 }
 
-/* Make sure "pw" has room for at least "n" more pieces.
+#if !DEFAULT_IS_ZERO
+
+/* Compute the sum of "pw1" and "pw2 on the union of their domains,
+ * with the actual sum on the shared domain and
+ * the defined expression on the symmetric difference of the domains.
  *
- * If there is only one reference to pw, we extend it in place.
- * Otherwise, we create a new PW and copy the pieces.
+ * This function is only defined for object types that do not have
+ * a default zero value.  For other object types, this function
+ * is simply called "add".
  */
-static __isl_give PW *FN(PW,grow)(__isl_take PW *pw, int n)
+__isl_give PW *FN(PW,union_add)(__isl_take PW *pw1, __isl_take PW *pw2)
 {
-	int i;
-	isl_ctx *ctx;
-	PW *res;
-
-	if (!pw)
-		return NULL;
-	if (pw->n + n <= pw->size)
-		return pw;
-	ctx = FN(PW,get_ctx)(pw);
-	n += pw->n;
-	if (pw->ref == 1) {
-		res = isl_realloc(ctx, pw, struct PW,
-			    sizeof(struct PW) + (n - 1) * sizeof(S(PW,piece)));
-		if (!res)
-			return FN(PW,free)(pw);
-		res->size = n;
-		return res;
-	}
-	res = FN(PW,alloc_size)(isl_space_copy(pw->dim) OPT_TYPE_ARG(pw->), n);
-	if (!res)
-		return FN(PW,free)(pw);
-	for (i = 0; i < pw->n; ++i)
-		res = FN(PW,add_piece)(res, isl_set_copy(pw->p[i].set),
-					    FN(EL,copy)(pw->p[i].FIELD));
-	FN(PW,free)(pw);
-	return res;
+	return FN(PW,union_add_)(pw1, pw2);
 }
 
-__isl_give PW *FN(PW,add_disjoint)(__isl_take PW *pw1, __isl_take PW *pw2)
-{
-	int i;
-	isl_ctx *ctx;
-
-	if (FN(PW,align_params_bin)(&pw1, &pw2) < 0)
-		goto error;
-
-	if (pw1->size < pw1->n + pw2->n && pw1->n < pw2->n)
-		return FN(PW,add_disjoint)(pw2, pw1);
-
-	ctx = isl_space_get_ctx(pw1->dim);
-	if (!OPT_EQUAL_TYPES(pw1->, pw2->))
-		isl_die(ctx, isl_error_invalid,
-			"fold types don't match", goto error);
-	if (FN(PW,check_equal_space)(pw1, pw2) < 0)
-		goto error;
-
-	if (FN(PW,IS_ZERO)(pw1)) {
-		FN(PW,free)(pw1);
-		return pw2;
-	}
-
-	if (FN(PW,IS_ZERO)(pw2)) {
-		FN(PW,free)(pw2);
-		return pw1;
-	}
-
-	pw1 = FN(PW,grow)(pw1, pw2->n);
-	if (!pw1)
-		goto error;
-
-	for (i = 0; i < pw2->n; ++i)
-		pw1 = FN(PW,add_piece)(pw1,
-				isl_set_copy(pw2->p[i].set),
-				FN(EL,copy)(pw2->p[i].FIELD));
-
-	FN(PW,free)(pw2);
-
-	return pw1;
-error:
-	FN(PW,free)(pw1);
-	FN(PW,free)(pw2);
-	return NULL;
-}
+#endif
 
 /* This function is currently only used from isl_aff.c
  */
@@ -971,58 +907,6 @@ static __isl_give PW *FN(PW,exploit_equalities_and_remove_if_empty)(
 	el = FN(PW,take_base_at)(pw, i);
 	el = FN(EL,substitute_equalities)(el, aff);
 	pw = FN(PW,restore_base_at_inplace)(pw, i, el);
-
-	return pw;
-}
-
-/* Convert a piecewise expression defined over a parameter domain
- * into one that is defined over a zero-dimensional set.
- */
-__isl_give PW *FN(PW,from_range)(__isl_take PW *pw)
-{
-	isl_space *space;
-
-	if (!pw)
-		return NULL;
-	if (!isl_space_is_set(pw->dim))
-		isl_die(FN(PW,get_ctx)(pw), isl_error_invalid,
-			"not living in a set space", return FN(PW,free)(pw));
-
-	space = FN(PW,get_space)(pw);
-	space = isl_space_from_range(space);
-	pw = FN(PW,reset_space)(pw, space);
-
-	return pw;
-}
-
-/* Fix the value of the given parameter or domain dimension of "pw"
- * to be equal to "value".
- */
-__isl_give PW *FN(PW,fix_si)(__isl_take PW *pw, enum isl_dim_type type,
-	unsigned pos, int value)
-{
-	int i;
-	isl_size n;
-
-	n = FN(PW,n_piece)(pw);
-	if (n < 0)
-		return FN(PW,free)(pw);
-
-	if (type == isl_dim_out)
-		isl_die(FN(PW,get_ctx)(pw), isl_error_invalid,
-			"cannot fix output dimension", return FN(PW,free)(pw));
-
-	if (type == isl_dim_in)
-		type = isl_dim_set;
-
-	for (i = n - 1; i >= 0; --i) {
-		isl_set *domain;
-
-		domain = FN(PW,take_domain_at)(pw, i);
-		domain = isl_set_fix_si(domain, type, pos, value);
-		pw = FN(PW,restore_domain_at)(pw, i, domain);
-		pw = FN(PW,exploit_equalities_and_remove_if_empty)(pw, i);
-	}
 
 	return pw;
 }
@@ -1505,81 +1389,9 @@ __isl_give PW *FN(PW,drop_unused_params)(__isl_take PW *pw)
 	return pw;
 }
 
-__isl_give PW *FN(PW,fix_dim)(__isl_take PW *pw,
-	enum isl_dim_type type, unsigned pos, isl_int v)
-{
-	int i;
-	isl_size n;
-
-	n = FN(PW,n_piece)(pw);
-	if (n < 0)
-		return FN(PW,free)(pw);
-
-	if (type == isl_dim_in)
-		type = isl_dim_set;
-
-	for (i = 0; i < n; ++i) {
-		isl_set *domain;
-
-		domain = FN(PW,take_domain_at)(pw, i);
-		domain = isl_set_fix(domain, type, pos, v);
-		pw = FN(PW,restore_domain_at)(pw, i, domain);
-		pw = FN(PW,exploit_equalities_and_remove_if_empty)(pw, i);
-	}
-
-	return pw;
-}
-
-/* Fix the value of the variable at position "pos" of type "type" of "pw"
- * to be equal to "v".
- */
-__isl_give PW *FN(PW,fix_val)(__isl_take PW *pw,
-	enum isl_dim_type type, unsigned pos, __isl_take isl_val *v)
-{
-	if (!v)
-		return FN(PW,free)(pw);
-	if (!isl_val_is_int(v))
-		isl_die(FN(PW,get_ctx)(pw), isl_error_invalid,
-			"expecting integer value", goto error);
-
-	pw = FN(PW,fix_dim)(pw, type, pos, v->n);
-	isl_val_free(v);
-
-	return pw;
-error:
-	isl_val_free(v);
-	return FN(PW,free)(pw);
-}
-
 isl_size FN(PW,dim)(__isl_keep PW *pw, enum isl_dim_type type)
 {
 	return isl_space_dim(FN(PW,peek_space)(pw), type);
-}
-
-__isl_give PW *FN(PW,split_dims)(__isl_take PW *pw,
-	enum isl_dim_type type, unsigned first, unsigned n)
-{
-	int i;
-	isl_size n_piece;
-
-	n_piece = FN(PW,n_piece)(pw);
-	if (n_piece < 0)
-		return FN(PW,free)(pw);
-	if (n == 0)
-		return pw;
-
-	if (type == isl_dim_in)
-		type = isl_dim_set;
-
-	for (i = 0; i < n; ++i) {
-		isl_set *domain;
-
-		domain = FN(PW,take_domain_at)(pw, i);
-		domain = isl_set_split_dims(domain, type, first, n);
-		pw = FN(PW,restore_domain_at)(pw, i, domain);
-	}
-
-	return pw;
 }
 
 __isl_give isl_space *FN(PW,get_domain_space)(__isl_keep PW *pw)
@@ -1909,37 +1721,6 @@ static __isl_give PW *FN(PW,negate_type)(__isl_take PW *pw)
 }
 #endif
 
-__isl_give PW *FN(PW,mul_isl_int)(__isl_take PW *pw, isl_int v)
-{
-	int i;
-	isl_size n;
-
-	if (isl_int_is_one(v))
-		return pw;
-	if (pw && DEFAULT_IS_ZERO && isl_int_is_zero(v)) {
-		PW *zero;
-		isl_space *space = FN(PW,get_space)(pw);
-		zero = FN(PW,ZERO)(space OPT_TYPE_ARG(pw->));
-		FN(PW,free)(pw);
-		return zero;
-	}
-	if (isl_int_is_neg(v))
-		pw = FN(PW,negate_type)(pw);
-
-	n = FN(PW,n_piece)(pw);
-	if (n < 0)
-		return FN(PW,free)(pw);
-	for (i = 0; i < n; ++i) {
-		EL *el;
-
-		el = FN(PW,take_base_at)(pw, i);
-		el = FN(EL,scale)(el, v);
-		pw = FN(PW,restore_base_at)(pw, i, el);
-	}
-
-	return pw;
-}
-
 /* Multiply the pieces of "pw" by "v" and return the result.
  */
 __isl_give PW *FN(PW,scale_val)(__isl_take PW *pw, __isl_take isl_val *v)
@@ -2028,11 +1809,6 @@ error:
 	return NULL;
 }
 
-__isl_give PW *FN(PW,scale)(__isl_take PW *pw, isl_int v)
-{
-	return FN(PW,mul_isl_int)(pw, v);
-}
-
 /* Apply some normalization to "pw".
  * In particular, sort the pieces according to their function value
  * expressions, combining pairs of adjacent pieces with
@@ -2042,7 +1818,7 @@ __isl_give PW *FN(PW,scale)(__isl_take PW *pw, isl_int v)
  * to return NULL, so we need to make sure we don't change the
  * meaning of any possible other copies of "pw".
  */
-__isl_give PW *FN(PW,normalize)(__isl_take PW *pw)
+static __isl_give PW *FN(PW,normalize)(__isl_take PW *pw)
 {
 	int i;
 	isl_set *set;

@@ -4488,6 +4488,9 @@ To actually print something, use
 	#include <isl/val.h>
 	__isl_give isl_printer *isl_printer_print_val(
 		__isl_take isl_printer *p, __isl_keep isl_val *v);
+	__isl_give isl_printer *isl_printer_print_multi_val(
+		__isl_take isl_printer *p,
+		__isl_keep isl_multi_val *mv);
 
 	#include <isl/set.h>
 	__isl_give isl_printer *isl_printer_print_basic_set(
@@ -4514,11 +4517,6 @@ To actually print something, use
 	__isl_give isl_printer *isl_printer_print_union_map(
 		__isl_take isl_printer *p,
 		__isl_keep isl_union_map *umap);
-
-	#include <isl/val.h>
-	__isl_give isl_printer *isl_printer_print_multi_val(
-		__isl_take isl_printer *p,
-		__isl_keep isl_multi_val *mv);
 
 	#include <isl/id.h>
 	__isl_give isl_printer *isl_printer_print_multi_id(
@@ -9440,6 +9438,9 @@ Lists can be created, copied, modified and freed using the following functions.
 		unsigned pos1, unsigned pos2);
 	__isl_give isl_set_list *isl_set_list_reverse(
 		__isl_take isl_set_list *list);
+	__isl_give isl_set_list *isl_set_list_set_at(
+		__isl_take isl_set_list *list, int index,
+		__isl_take isl_set *set);
 	__isl_give isl_set_list *isl_set_list_set_set(
 		__isl_take isl_set_list *list, int index,
 		__isl_take isl_set *set);
@@ -9467,6 +9468,7 @@ C<isl_set_list_from_set> performs the same operation.
 C<isl_set_list_clear> removes all elements from a list.
 C<isl_set_list_swap> swaps the elements at the specified locations.
 C<isl_set_list_reverse> reverses the elements in the list.
+C<isl_set_list_set_set> is an alternative name for C<isl_set_list_set_at>.
 
 Lists can be inspected using the following functions.
 
@@ -9602,6 +9604,11 @@ Associative arrays can be inspected using the following functions.
 		isl_stat (*fn)(__isl_take isl_id *key,
 			__isl_take isl_ast_expr *val, void *user),
 		void *user);
+	isl_bool isl_id_to_ast_expr_every(
+		__isl_keep isl_id_to_ast_expr *id2expr,
+		isl_bool (*test)(__isl_keep isl_id *key,
+			__isl_keep isl_ast_expr *val, void *user),
+		void *user);
 
 The function C<isl_id_to_ast_expr_try_get> returns a structure
 containing two elements, C<valid> and C<value>.
@@ -9625,12 +9632,33 @@ Associative arrays can be modified using the following functions.
 		__isl_take isl_id_to_ast_expr *id2expr,
 		__isl_take isl_id *key);
 
-Associative arrays can be printed using the following function.
+Associative arrays can be checked for (obvious) equality
+using the following function.
+
+	#include <isl/id_to_ast_expr.h>
+	isl_bool isl_id_to_ast_expr_is_equal(
+		__isl_take isl_id_to_ast_expr *id2expr1,
+		__isl_take isl_id_to_ast_expr *id2expr2);
+
+Note that depending on how the keys and values are being compared,
+for other types of keys and/or values, this function may be called
+C<plain_is_equal> rather than C<is_equal>.
+
+Associative arrays can be printed using the following functions.
 
 	#include <isl/id_to_ast_expr.h>
 	__isl_give isl_printer *isl_printer_print_id_to_ast_expr(
 		__isl_take isl_printer *p,
 		__isl_keep isl_id_to_ast_expr *id2expr);
+	__isl_give char *isl_id_to_ast_expr_to_str(
+		__isl_keep isl_id_to_ast_expr *id2expr);
+
+They can be read from input using the following function.
+
+	#include <isl/id_to_ast_expr.h>
+	__isl_give isl_id_to_ast_expr *
+	isl_id_to_ast_expr_read_from_str(isl_ctx *ctx,
+		const char *str);
 
 =head2 Vectors
 
@@ -12049,6 +12077,18 @@ subexpressions of C<expr> of type C<isl_ast_expr_id>
 by the corresponding expression in C<id2expr>, if there is any.
 
 
+The following function can be used to modify the descendants
+of a specific node in an AST using a depth-first post-order
+traversal of those descendants (including the node itself).
+
+	#include <isl/ast.h>
+	__isl_give isl_ast_node *
+	isl_ast_node_map_descendant_bottom_up(
+		__isl_take isl_ast_node *node,
+		__isl_give isl_ast_node *(*fn)(
+			__isl_take isl_ast_node *node,
+			void *user), void *user);
+
 User specified data can be attached to an C<isl_ast_node> and obtained
 from the same C<isl_ast_node> using the following functions.
 
@@ -12820,8 +12860,21 @@ AST generation or a
 user defined node created using the following function.
 
 	#include <isl/ast.h>
+	__isl_give isl_ast_node *isl_ast_node_user_from_expr(
+		__isl_take isl_ast_expr *expr);
 	__isl_give isl_ast_node *isl_ast_node_alloc_user(
 		__isl_take isl_ast_expr *expr);
+
+C<isl_ast_node_alloc_user> is an alternative name for
+C<isl_ast_node_user_from_expr>.
+
+In some cases, a single user defined node is not enough,
+in which case the following function can be used
+to create a block node from multiple AST nodes.
+
+	#include <isl/ast.h>
+	__isl_give isl_ast_node *isl_ast_node_block_from_children(
+		__isl_take isl_ast_node_list *list);
 
 	#include <isl/ast_build.h>
 	__isl_give isl_ast_build *

@@ -515,6 +515,7 @@ EXTRA_DIST = \
 	isl_aff_lex_templ.c \
 	isl_align_params_templ.c \
 	isl_align_params_bin_templ.c \
+	isl_ast_node_set_field_templ.c \
 	basis_reduction_templ.c \
 	isl_bind_domain_templ.c \
 	bset_to_bmap.c \
@@ -528,6 +529,7 @@ EXTRA_DIST = \
 	isl_copy_tuple_id_templ.c \
 	isl_domain_factor_templ.c \
 	extract_key.c \
+	isl_from_range_templ.c \
 	isl_ilp_opt_fn_val_templ.c \
 	isl_ilp_opt_multi_val_templ.c \
 	isl_ilp_opt_val_templ.c \
@@ -537,6 +539,7 @@ EXTRA_DIST = \
 	isl_list_templ.c \
 	isl_list_templ.h \
 	isl_list_read_templ.c \
+	isl_list_read_yaml_templ.c \
 	isl_map_bound_templ.c \
 	isl_map_lexopt_templ.c \
 	isl_maybe_ast_graft_list.h \
@@ -567,6 +570,7 @@ EXTRA_DIST = \
 	isl_multi_domain_templ.c \
 	isl_multi_floor.c \
 	isl_multi_from_base_templ.c \
+	isl_multi_from_tuple_templ.c \
 	isl_multi_gist.c \
 	isl_multi_hash.c \
 	isl_multi_insert_domain_templ.c \
@@ -601,8 +605,11 @@ EXTRA_DIST = \
 	isl_pw_add_constant_templ.c \
 	isl_pw_add_constant_multi_val_templ.c \
 	isl_pw_add_constant_val_templ.c \
+	isl_pw_add_disjoint_templ.c \
 	isl_pw_bind_domain_templ.c \
 	isl_pw_eval.c \
+	isl_pw_fix_templ.c \
+	isl_pw_from_range_templ.c \
 	isl_pw_hash.c \
 	isl_pw_insert_dims_templ.c \
 	isl_pw_insert_domain_templ.c \
@@ -612,15 +619,21 @@ EXTRA_DIST = \
 	isl_pw_move_dims_templ.c \
 	isl_pw_neg_templ.c \
 	isl_pw_opt_templ.c \
+	isl_pw_print_templ.c \
 	isl_pw_pullback_templ.c \
 	isl_pw_range_tuple_id_templ.c \
+	isl_pw_scale_templ.c \
+	isl_pw_split_dims_templ.c \
 	isl_pw_sub_templ.c \
 	isl_pw_un_op_templ.c \
 	isl_pw_union_opt.c \
+	isl_read_from_str_templ.c \
 	read_in_string_templ.c \
 	set_to_map.c \
 	set_from_map.c \
 	set_list_from_map_list_inl.c \
+	isl_stream_read_pw_with_params_templ.c \
+	isl_stream_read_with_params_templ.c \
 	isl_tab_lexopt_templ.c \
 	isl_test_list_templ.c \
 	isl_test_plain_equal_templ.c \
@@ -640,7 +653,9 @@ EXTRA_DIST = \
 	isl_union_locals_templ.c \
 	isl_union_map_lex_templ.c \
 	isl_union_neg.c \
+	isl_union_print_templ.c \
 	isl_union_pw_templ.c \
+	isl_union_sub_templ.c \
 	libisl-gdb.py \
 	doc/CodingStyle \
 	doc/SubmittingPatches \

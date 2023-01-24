@@ -1,3 +1,22 @@
+/*
+ * Copyright 2008-2009 Katholieke Universiteit Leuven
+ * Copyright 2010      INRIA Saclay
+ * Copyright 2012-2013 Ecole Normale Superieure
+ * Copyright 2014      INRIA Rocquencourt
+ * Copyright 2021-2022 Cerebras Systems
+ *
+ * Use of this software is governed by the MIT license
+ *
+ * Written by Sven Verdoolaege, K.U.Leuven, Departement
+ * Computerwetenschappen, Celestijnenlaan 200A, B-3001 Leuven, Belgium
+ * and INRIA Saclay - Ile-de-France, Parc Club Orsay Universite,
+ * ZAC des vignes, 4 rue Jacques Monod, 91893 Orsay, France
+ * and Ecole Normale Superieure, 45 rue d'Ulm, 75230 Paris, France
+ * and Inria Paris - Rocquencourt, Domaine de Voluceau - Rocquencourt,
+ * B.P. 105 - 78153 Le Chesnay, France
+ * and Cerebras Systems, 1237 E Arques Ave, Sunnyvale, CA, USA
+ */
+
 #include <assert.h>
 #include <stdlib.h>
 
@@ -28,6 +47,23 @@ static binary_fn<A1, R, T> const arg(const binary_fn<A1, R, T> &fn)
 	return fn;
 }
 
+/* A ternary isl function that appears in the C++ bindings
+ * as a binary method in a class T, taking extra arguments
+ * of type A1 and A2 and returning an object of type R.
+ */
+template <typename A1, typename A2, typename R, typename T>
+using ternary_fn = R (T::*)(A1, A2) const;
+
+/* A function for selecting an overload of a pointer to a binary C++ method
+ * based on the (first) argument type(s).
+ * The object type and the return type are meant to be deduced.
+ */
+template <typename A1, typename A2, typename R, typename T>
+static ternary_fn<A1, A2, R, T> const arg(const ternary_fn<A1, A2, R, T> &fn)
+{
+	return fn;
+}
+
 /* A description of the input and the output of a unary operation.
  */
 struct unary {
@@ -40,6 +76,15 @@ struct unary {
 struct binary {
 	const char *arg1;
 	const char *arg2;
+	const char *res;
+};
+
+/* A description of the inputs and the output of a ternary operation.
+ */
+struct ternary {
+	const char *arg1;
+	const char *arg2;
+	const char *arg3;
 	const char *res;
 };
 
@@ -114,6 +159,34 @@ static void test(isl::ctx ctx, R (T::*fn)(A1) const, const std::string &name,
 		   << res << "\n"
 		   << "expecting:\n"
 		   << test.res;
+		THROW_INVALID(ss.str().c_str());
+	}
+}
+
+/* Run a sequence of tests of method "fn" with stringification "name" and
+ * with inputs and output described by "test",
+ * throwing an exception when an unexpected result is produced.
+ */
+template <typename R, typename T, typename A1, typename A2>
+static void test(isl::ctx ctx, R (T::*fn)(A1, A2) const,
+	const std::string &name, const std::vector<ternary> &tests)
+{
+	for (const auto &test : tests) {
+		T obj(ctx, test.arg1);
+		A1 arg1(ctx, test.arg2);
+		A2 arg2(ctx, test.arg3);
+		R expected(ctx, test.res);
+		const auto &res = (obj.*fn)(arg1, arg2);
+		std::ostringstream ss;
+
+		if (is_equal(expected, res))
+			continue;
+
+		ss << name << "(" << test.arg1 << ", " << test.arg2 << ", "
+		   << test.arg3 << ") =\n"
+		   << res << "\n"
+		   << "expecting:\n"
+		   << expected;
 		THROW_INVALID(ss.str().c_str());
 	}
 }
@@ -219,6 +292,23 @@ static void test_preimage(isl::ctx ctx)
 	});
 }
 
+/* Perform some basic fixed power tests.
+ */
+static void test_fixed_power(isl::ctx ctx)
+{
+	C(arg<isl::val>(&isl::map::fixed_power), {
+	{ "{ [i] -> [i + 1] }", "23",
+	  "{ [i] -> [i + 23] }" },
+	{ "{ [a = 0:1, b = 0:15, c = 0:1, d = 0:1, 0] -> [a, b, c, d, 1]; "
+	    "[a = 0:1, b = 0:15, c = 0:1, 0, 1] -> [a, b, c, 1, 0];  "
+	    "[a = 0:1, b = 0:15, 0, 1, 1] -> [a, b, 1, 0, 0];  "
+	    "[a = 0:1, b = 0:14, 1, 1, 1] -> [a, 1 + b, 0, 0, 0];  "
+	    "[0, 15, 1, 1, 1] -> [1, 0, 0, 0, 0] }",
+	  "128",
+	  "{ [0, b = 0:15, c = 0:1, d = 0:1, e = 0:1] -> [1, b, c, d, e] }" },
+	});
+}
+
 /* Perform some basic intersection tests.
  */
 static void test_intersect(isl::ctx ctx)
@@ -279,8 +369,8 @@ static void test_scale(isl::ctx ctx)
 	  "{ A[a] -> B[2a, 7a + 7, 0] : a >= 0 }" },
 	});
 	C(arg<isl::multi_val>(&isl::pw_multi_aff::scale), {
-	{ "{ A[a] -> B[a, a - 1] : a >= 0 }", "{ B[1/2, 7] }",
-	  "{ A[a] -> B[a/2, 7a - 7] : a >= 0 }" },
+	{ "{ A[a] -> B[1, a - 1] : a >= 0 }", "{ B[1/2, 7] }",
+	  "{ A[a] -> B[1/2, 7a - 7] : a >= 0 }" },
 	});
 
 	C(arg<isl::multi_val>(&isl::pw_multi_aff::scale_down), {
@@ -293,6 +383,24 @@ static void test_scale(isl::ctx ctx)
 	});
 }
 
+/* Perform some basic isl::id_to_id tests.
+ */
+static void test_id_to_id(isl::ctx ctx)
+{
+	C((arg<isl::id, isl::id>(&isl::id_to_id::set)), {
+	{ "{ }", "a", "b",
+	  "{ a: b }" },
+	{ "{ a: b }", "a", "b",
+	  "{ a: b }" },
+	{ "{ a: c }", "a", "b",
+	  "{ a: b }" },
+	{ "{ a: b }", "b", "a",
+	  "{ a: b, b: a }" },
+	{ "{ a: b }", "b", "a",
+	  "{ b: a, a: b }" },
+	});
+}
+
 /* The list of tests to perform.
  */
 static std::vector<std::pair<const char *, void (*)(isl::ctx)>> tests =
@@ -300,10 +408,12 @@ static std::vector<std::pair<const char *, void (*)(isl::ctx)>> tests =
 	{ "space", &test_space },
 	{ "conversion", &test_conversion },
 	{ "preimage", &test_preimage },
+	{ "fixed power", &test_fixed_power },
 	{ "intersect", &test_intersect },
 	{ "gist", &test_gist },
 	{ "project out parameters", &test_project },
 	{ "scale", &test_scale },
+	{ "id-to-id", &test_id_to_id },
 };
 
 /* Perform some basic checks by means of the C++ bindings.

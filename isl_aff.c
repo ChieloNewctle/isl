@@ -2793,14 +2793,18 @@ static __isl_give isl_aff *isl_aff_zero_in_space(__isl_take isl_space *space)
 #include <isl_pw_templ.c>
 #include <isl_pw_un_op_templ.c>
 #include <isl_pw_add_constant_val_templ.c>
+#include <isl_pw_add_disjoint_templ.c>
 #include <isl_pw_bind_domain_templ.c>
 #include <isl_pw_eval.c>
 #include <isl_pw_hash.c>
+#include <isl_pw_fix_templ.c>
+#include <isl_pw_from_range_templ.c>
 #include <isl_pw_insert_dims_templ.c>
 #include <isl_pw_insert_domain_templ.c>
 #include <isl_pw_move_dims_templ.c>
 #include <isl_pw_neg_templ.c>
 #include <isl_pw_pullback_templ.c>
+#include <isl_pw_scale_templ.c>
 #include <isl_pw_sub_templ.c>
 #include <isl_pw_union_opt.c>
 
@@ -2809,6 +2813,7 @@ static __isl_give isl_aff *isl_aff_zero_in_space(__isl_take isl_space *space)
 
 #include <isl_union_single.c>
 #include <isl_union_neg.c>
+#include <isl_union_sub_templ.c>
 
 #undef BASE
 #define BASE aff
@@ -3487,12 +3492,6 @@ __isl_give isl_pw_aff *isl_pw_aff_add(__isl_take isl_pw_aff *pwaff1,
 {
 	isl_pw_aff_align_params_bin(&pwaff1, &pwaff2);
 	return isl_pw_aff_on_shared_domain(pwaff1, pwaff2, &isl_aff_add);
-}
-
-__isl_give isl_pw_aff *isl_pw_aff_union_add(__isl_take isl_pw_aff *pwaff1,
-	__isl_take isl_pw_aff *pwaff2)
-{
-	return isl_pw_aff_union_add_(pwaff1, pwaff2);
 }
 
 __isl_give isl_pw_aff *isl_pw_aff_mul(__isl_take isl_pw_aff *pwaff1,
@@ -4598,7 +4597,10 @@ __isl_give isl_set *isl_multi_aff_lex_gt_set(__isl_take isl_multi_aff *ma1,
 #include <isl_pw_un_op_templ.c>
 #include <isl_pw_add_constant_multi_val_templ.c>
 #include <isl_pw_add_constant_val_templ.c>
+#include <isl_pw_add_disjoint_templ.c>
 #include <isl_pw_bind_domain_templ.c>
+#include <isl_pw_fix_templ.c>
+#include <isl_pw_from_range_templ.c>
 #include <isl_pw_insert_dims_templ.c>
 #include <isl_pw_insert_domain_templ.c>
 #include <isl_pw_locals_templ.c>
@@ -4614,6 +4616,7 @@ __isl_give isl_set *isl_multi_aff_lex_gt_set(__isl_take isl_multi_aff *ma1,
 #include <isl_union_multi.c>
 #include "isl_union_locals_templ.c"
 #include <isl_union_neg.c>
+#include <isl_union_sub_templ.c>
 
 #undef BASE
 #define BASE multi_aff
@@ -4744,33 +4747,6 @@ __isl_give isl_pw_multi_aff *isl_pw_multi_aff_sub(
 	isl_pw_multi_aff_align_params_bin(&pma1, &pma2);
 	return isl_pw_multi_aff_on_shared_domain(pma1, pma2,
 						&isl_multi_aff_sub);
-}
-
-__isl_give isl_pw_multi_aff *isl_pw_multi_aff_union_add(
-	__isl_take isl_pw_multi_aff *pma1, __isl_take isl_pw_multi_aff *pma2)
-{
-	return isl_pw_multi_aff_union_add_(pma1, pma2);
-}
-
-/* Compute the sum of "upa1" and "upa2" on the union of their domains,
- * with the actual sum on the shared domain and
- * the defined expression on the symmetric difference of the domains.
- */
-__isl_give isl_union_pw_aff *isl_union_pw_aff_union_add(
-	__isl_take isl_union_pw_aff *upa1, __isl_take isl_union_pw_aff *upa2)
-{
-	return isl_union_pw_aff_union_add_(upa1, upa2);
-}
-
-/* Compute the sum of "upma1" and "upma2" on the union of their domains,
- * with the actual sum on the shared domain and
- * the defined expression on the symmetric difference of the domains.
- */
-__isl_give isl_union_pw_multi_aff *isl_union_pw_multi_aff_union_add(
-	__isl_take isl_union_pw_multi_aff *upma1,
-	__isl_take isl_union_pw_multi_aff *upma2)
-{
-	return isl_union_pw_multi_aff_union_add_(upma1, upma2);
 }
 
 /* Given two piecewise multi-affine expressions A -> B and C -> D,

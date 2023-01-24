@@ -3109,13 +3109,17 @@ static __isl_give isl_qpolynomial *isl_qpolynomial_zero_in_space(
 
 #include <isl_pw_templ.c>
 #include <isl_pw_un_op_templ.c>
+#include <isl_pw_add_disjoint_templ.c>
 #include <isl_pw_eval.c>
+#include <isl_pw_fix_templ.c>
+#include <isl_pw_from_range_templ.c>
 #include <isl_pw_insert_dims_templ.c>
 #include <isl_pw_lift_templ.c>
 #include <isl_pw_morph_templ.c>
 #include <isl_pw_move_dims_templ.c>
 #include <isl_pw_neg_templ.c>
 #include <isl_pw_opt_templ.c>
+#include <isl_pw_split_dims_templ.c>
 #include <isl_pw_sub_templ.c>
 
 #undef BASE
@@ -3124,6 +3128,7 @@ static __isl_give isl_qpolynomial *isl_qpolynomial_zero_in_space(
 #include <isl_union_single.c>
 #include <isl_union_eval.c>
 #include <isl_union_neg.c>
+#include <isl_union_sub_templ.c>
 
 int isl_pw_qpolynomial_is_one(__isl_keep isl_pw_qpolynomial *pwqp)
 {
