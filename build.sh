@@ -3,12 +3,12 @@
 ISL_ROOT="$(dirname "$0")"
 cd "$ISL_ROOT"
 
-if [ ! -e "./configure" ]; then (
+if [ ! -e "./isl_config.h" ]; then
     autoreconf -i
     ./configure --with-clang=system --with-int=imath
-) fi
+fi
 
 make $@ all interface/isl.py
 
-ln -sf $(realpath $ISL_ROOT/interface/isl.py) $ISL_ROOT/isl.py
-ln -sf $(realpath $ISL_ROOT/.libs/libisl.so) $ISL_ROOT/libisl.so
+ln -sf $(realpath interface/isl.py) isl.py
+ln -sf $(realpath .libs/libisl.so) libisl.so
