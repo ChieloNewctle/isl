@@ -233,6 +233,7 @@ libisl_la_SOURCES = \
 	isl_vertices_private.h \
 	isl_vertices.c \
 	isl_yaml.h
+EXTRA_libisl_la_DEPENDENCIES = gitversion.h
 libisl_la_LIBADD = @MP_LIBS@
 libisl_la_LDFLAGS = -version-info @versioninfo@ \
 	@MP_LDFLAGS@
