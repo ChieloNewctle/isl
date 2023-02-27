@@ -53,7 +53,7 @@ isl_stat isl_space_check_wrapped_tuple_is_equal(__isl_keep isl_space *space1,
 
 isl_size isl_space_wrapped_dim(__isl_keep isl_space *space,
 	enum isl_dim_type outer, enum isl_dim_type inner);
-unsigned isl_space_offset(__isl_keep isl_space *space, enum isl_dim_type type);
+isl_size isl_space_offset(__isl_keep isl_space *space, enum isl_dim_type type);
 
 isl_stat isl_space_check_range(__isl_keep isl_space *space,
 	enum isl_dim_type type, unsigned first, unsigned n);
@@ -73,6 +73,7 @@ __isl_give isl_space *isl_space_reset(__isl_take isl_space *space,
 	enum isl_dim_type type);
 __isl_give isl_space *isl_space_flatten(__isl_take isl_space *space);
 
+isl_stat isl_space_check_is_wrapping(__isl_keep isl_space *space);
 isl_stat isl_space_check_domain_is_wrapping(__isl_keep isl_space *space);
 isl_stat isl_space_check_range_is_wrapping(__isl_keep isl_space *space);
 
@@ -95,6 +96,8 @@ __isl_give isl_space *isl_space_bind_domain_wrapped_domain(
 	__isl_take isl_space *space, __isl_keep isl_multi_id *tuple);
 __isl_give isl_space *isl_space_unbind_params_insert_domain(
 	__isl_take isl_space *space, __isl_keep isl_multi_id *tuple);
+__isl_give isl_space *isl_space_reverse_wrapped(__isl_take isl_space *space,
+	enum isl_dim_type type);
 
 int isl_space_cmp(__isl_keep isl_space *space1, __isl_keep isl_space *space2);
 

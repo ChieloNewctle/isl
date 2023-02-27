@@ -6,6 +6,7 @@
  * Copyright 2016      INRIA Paris
  * Copyright 2016      Sven Verdoolaege
  * Copyright 2018-2019 Cerebras Systems
+ * Copyright 2022      Cerebras Systems
  *
  * Use of this software is governed by the MIT license
  *
@@ -147,8 +148,6 @@ isl_size isl_basic_map_var_offset(__isl_keep isl_basic_map *bmap,
 	isl_space *space;
 
 	space = isl_basic_map_peek_space(bmap);
-	if (!space)
-		return isl_size_error;
 
 	switch (type) {
 	case isl_dim_param:
@@ -4016,6 +4015,47 @@ __isl_give isl_basic_map *isl_basic_map_reverse(__isl_take isl_basic_map *bmap)
 	return isl_basic_map_reset_space(bmap, space);
 }
 
+/* Given a basic map where the tuple of type "type" is a wrapped map,
+ * swap domain and range of that wrapped map.
+ */
+static __isl_give isl_basic_map *isl_basic_map_reverse_wrapped(
+	__isl_take isl_basic_map *bmap, enum isl_dim_type type)
+{
+	isl_space *space;
+	isl_size offset, n1, n2;
+
+	space = isl_basic_map_peek_space(bmap);
+	offset = isl_basic_map_var_offset(bmap, type);
+	n1 = isl_space_wrapped_dim(space, type, isl_dim_in);
+	n2 = isl_space_wrapped_dim(space, type, isl_dim_out);
+	if (offset < 0 || n1 < 0 || n2 < 0)
+		return isl_basic_map_free(bmap);
+
+	bmap = isl_basic_map_swap_vars(bmap, 1 + offset, n1, n2);
+
+	space = isl_basic_map_take_space(bmap);
+	space = isl_space_reverse_wrapped(space, type);
+	bmap = isl_basic_map_restore_space(bmap, space);
+
+	return bmap;
+}
+
+/* Given a basic map (A -> B) -> C, return the corresponding basic map
+ * (B -> A) -> C.
+ */
+static __isl_give isl_basic_map *isl_basic_map_domain_reverse(
+	__isl_take isl_basic_map *bmap)
+{
+	isl_space *space;
+
+	space = isl_basic_map_peek_space(bmap);
+	if (isl_space_check_domain_is_wrapping(space) < 0)
+		return isl_basic_map_free(bmap);
+	bmap = isl_basic_map_reverse_wrapped(bmap, isl_dim_in);
+
+	return bmap;
+}
+
 /* Given a basic map A -> (B -> C), return the corresponding basic map
  * A -> (C -> B).
  */
@@ -4023,22 +4063,27 @@ static __isl_give isl_basic_map *isl_basic_map_range_reverse(
 	__isl_take isl_basic_map *bmap)
 {
 	isl_space *space;
-	isl_size offset, n1, n2;
 
 	space = isl_basic_map_peek_space(bmap);
 	if (isl_space_check_range_is_wrapping(space) < 0)
 		return isl_basic_map_free(bmap);
-	offset = isl_basic_map_var_offset(bmap, isl_dim_out);
-	n1 = isl_space_wrapped_dim(space, isl_dim_out, isl_dim_in);
-	n2 = isl_space_wrapped_dim(space, isl_dim_out, isl_dim_out);
-	if (offset < 0 || n1 < 0 || n2 < 0)
+	bmap = isl_basic_map_reverse_wrapped(bmap, isl_dim_out);
+
+	return bmap;
+}
+
+/* Given a basic map that is actually a basic set (A -> B),
+ * return the corresponding basic set (B -> A) as a basic map.
+ */
+static __isl_give isl_basic_map *isl_basic_map_set_reverse(
+	__isl_take isl_basic_map *bmap)
+{
+	isl_space *space;
+
+	space = isl_basic_map_peek_space(bmap);
+	if (isl_space_check_is_wrapping(space) < 0)
 		return isl_basic_map_free(bmap);
-
-	bmap = isl_basic_map_swap_vars(bmap, 1 + offset, n1, n2);
-
-	space = isl_basic_map_take_space(bmap);
-	space = isl_space_range_reverse(space);
-	bmap = isl_basic_map_restore_space(bmap, space);
+	bmap = isl_basic_map_reverse_wrapped(bmap, isl_dim_set);
 
 	return bmap;
 }
@@ -7195,12 +7240,31 @@ __isl_give isl_map *isl_map_reverse(__isl_take isl_map *map)
 					&isl_basic_map_reverse);
 }
 
+/* Given a map (A -> B) -> C, return the corresponding map (B -> A) -> C.
+ */
+__isl_give isl_map *isl_map_domain_reverse(__isl_take isl_map *map)
+{
+	return isl_map_transform(map, &isl_space_domain_reverse,
+					&isl_basic_map_domain_reverse);
+}
+
 /* Given a map A -> (B -> C), return the corresponding map A -> (C -> B).
  */
 __isl_give isl_map *isl_map_range_reverse(__isl_take isl_map *map)
 {
 	return isl_map_transform(map, &isl_space_range_reverse,
 					&isl_basic_map_range_reverse);
+}
+
+/* Given a set (A -> B), return the corresponding set (B -> A).
+ */
+__isl_give isl_set *isl_set_wrapped_reverse(__isl_take isl_set *set)
+{
+	isl_map *map = set_to_map(set);
+
+	map = isl_map_transform(map, &isl_space_wrapped_reverse,
+					&isl_basic_map_set_reverse);
+	return set_from_map(map);
 }
 
 #undef TYPE
@@ -12082,8 +12146,7 @@ static int unique(isl_int *p, unsigned pos, unsigned len)
 isl_bool isl_basic_set_is_box(__isl_keep isl_basic_set *bset)
 {
 	int i, j;
-	isl_size nvar, n_div;
-	unsigned ovar;
+	isl_size nvar, ovar, n_div;
 
 	n_div = isl_basic_set_dim(bset, isl_dim_div);
 	if (n_div < 0)
@@ -12092,9 +12155,9 @@ isl_bool isl_basic_set_is_box(__isl_keep isl_basic_set *bset)
 		return isl_bool_false;
 
 	nvar = isl_basic_set_dim(bset, isl_dim_set);
-	if (nvar < 0)
-		return isl_bool_error;
 	ovar = isl_space_offset(bset->dim, isl_dim_set);
+	if (nvar < 0 || ovar < 0)
+		return isl_bool_error;
 	for (j = 0; j < nvar; ++j) {
 		int lower = 0, upper = 0;
 		for (i = 0; i < bset->n_eq; ++i) {
@@ -12604,29 +12667,10 @@ __isl_give isl_basic_set *isl_basic_set_align_params(
 	return isl_basic_map_align_params(bset, model);
 }
 
-/* Drop all parameters not referenced by "map".
- */
-__isl_give isl_map *isl_map_drop_unused_params(__isl_take isl_map *map)
-{
-	int i;
-	isl_size n;
-
-	n = isl_map_dim(map, isl_dim_param);
-	if (isl_map_check_named_params(map) < 0 || n < 0)
-		return isl_map_free(map);
-
-	for (i = n - 1; i >= 0; i--) {
-		isl_bool involves;
-
-		involves = isl_map_involves_dims(map, isl_dim_param, i, 1);
-		if (involves < 0)
-			return isl_map_free(map);
-		if (!involves)
-			map = isl_map_project_out(map, isl_dim_param, i, 1);
-	}
-
-	return map;
-}
+#undef TYPE
+#define TYPE	isl_map
+#define isl_map_drop_dims	isl_map_drop
+#include "isl_drop_unused_params_templ.c"
 
 /* Drop all parameters not referenced by "set".
  */
@@ -12636,31 +12680,10 @@ __isl_give isl_set *isl_set_drop_unused_params(
 	return set_from_map(isl_map_drop_unused_params(set_to_map(set)));
 }
 
-/* Drop all parameters not referenced by "bmap".
- */
-__isl_give isl_basic_map *isl_basic_map_drop_unused_params(
-	__isl_take isl_basic_map *bmap)
-{
-	isl_size nparam;
-	int i;
-
-	nparam = isl_basic_map_dim(bmap, isl_dim_param);
-	if (nparam < 0 || isl_basic_map_check_named_params(bmap) < 0)
-		return isl_basic_map_free(bmap);
-
-	for (i = nparam - 1; i >= 0; i--) {
-		isl_bool involves;
-
-		involves = isl_basic_map_involves_dims(bmap,
-							isl_dim_param, i, 1);
-		if (involves < 0)
-			return isl_basic_map_free(bmap);
-		if (!involves)
-			bmap = isl_basic_map_drop(bmap, isl_dim_param, i, 1);
-	}
-
-	return bmap;
-}
+#undef TYPE
+#define TYPE	isl_basic_map
+#define isl_basic_map_drop_dims	isl_basic_map_drop
+#include "isl_drop_unused_params_templ.c"
 
 /* Drop all parameters not referenced by "bset".
  */

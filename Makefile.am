@@ -528,6 +528,7 @@ EXTRA_DIST = \
 	check_type_range_templ.c \
 	isl_copy_tuple_id_templ.c \
 	isl_domain_factor_templ.c \
+	isl_drop_unused_params_templ.c \
 	extract_key.c \
 	isl_from_range_templ.c \
 	isl_ilp_opt_fn_val_templ.c \
@@ -554,20 +555,24 @@ EXTRA_DIST = \
 	isl_multi_templ.c \
 	isl_multi_templ.h \
 	isl_multi_add_constant_templ.c \
-	isl_multi_align_templ.c \
 	isl_multi_align_set.c \
 	isl_multi_align_union_set.c \
 	isl_multi_apply_templ.c \
-	isl_multi_apply_set.c \
-	isl_multi_apply_union_set.c \
+	isl_multi_apply_explicit_domain_templ.c \
+	isl_multi_apply_no_explicit_domain_templ.c \
+	isl_multi_apply_set_explicit_domain_templ.c \
+	isl_multi_apply_set_no_explicit_domain_templ.c \
+	isl_multi_apply_union_set_explicit_domain_templ.c \
 	isl_multi_arith_templ.c \
 	isl_multi_bin_val_templ.c \
 	isl_multi_bind_domain_templ.c \
+	isl_multi_check_domain_templ.c \
 	isl_multi_cmp.c \
 	isl_multi_coalesce.c \
 	isl_multi_dim_id_templ.c \
 	isl_multi_dims.c \
 	isl_multi_domain_templ.c \
+	isl_multi_domain_reverse_templ.c \
 	isl_multi_floor.c \
 	isl_multi_from_base_templ.c \
 	isl_multi_from_tuple_templ.c \
@@ -607,6 +612,7 @@ EXTRA_DIST = \
 	isl_pw_add_constant_val_templ.c \
 	isl_pw_add_disjoint_templ.c \
 	isl_pw_bind_domain_templ.c \
+	isl_pw_domain_reverse_templ.c \
 	isl_pw_eval.c \
 	isl_pw_fix_templ.c \
 	isl_pw_from_range_templ.c \
@@ -649,6 +655,7 @@ EXTRA_DIST = \
 	isl_union_templ.c \
 	isl_union_single.c \
 	isl_union_multi.c \
+	isl_union_domain_reverse_templ.c \
 	isl_union_eval.c \
 	isl_union_locals_templ.c \
 	isl_union_map_lex_templ.c \

@@ -8058,56 +8058,6 @@ int test_vertices(isl_ctx *ctx)
 	return 0;
 }
 
-/* Inputs for basic tests of unary operations on isl_union_map.
- * "fn" is the function that is being tested.
- * "arg" is a string description of the input.
- * "res" is a string description of the expected result.
- */
-static struct {
-	__isl_give isl_union_map *(*fn)(__isl_take isl_union_map *umap);
-	const char *arg;
-	const char *res;
-} umap_un_tests[] = {
-	{ &isl_union_map_range_reverse,
-	  "{ A[] -> [B[] -> C[]]; A[] -> B[]; A[0] -> N[B[1] -> B[2]] }",
-	  "{ A[] -> [C[] -> B[]]; A[0] -> N[B[2] -> B[1]] }" },
-	{ &isl_union_map_range_reverse,
-	  "{ A[] -> N[B[] -> C[]] }",
-	  "{ A[] -> [C[] -> B[]] }" },
-	{ &isl_union_map_range_reverse,
-	  "{ A[] -> N[B[x] -> B[y]] }",
-	  "{ A[] -> N[B[*] -> B[*]] }" },
-};
-
-/* Perform basic tests of unary operations on isl_union_map.
- */
-static isl_stat test_un_union_map(isl_ctx *ctx)
-{
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(umap_un_tests); ++i) {
-		const char *str;
-		isl_union_map *umap, *res;
-		isl_bool equal;
-
-		str = umap_un_tests[i].arg;
-		umap = isl_union_map_read_from_str(ctx, str);
-		str = umap_un_tests[i].res;
-		res = isl_union_map_read_from_str(ctx, str);
-		umap = umap_un_tests[i].fn(umap);
-		equal = isl_union_map_is_equal(umap, res);
-		isl_union_map_free(umap);
-		isl_union_map_free(res);
-		if (equal < 0)
-			return isl_stat_error;
-		if (!equal)
-			isl_die(ctx, isl_error_unknown,
-				"unexpected result", return isl_stat_error);
-	}
-
-	return isl_stat_ok;
-}
-
 /* Inputs for basic tests of binary operations on isl_union_map.
  * "fn" is the function that is being tested.
  * "arg1" and "arg2" are string descriptions of the inputs.
@@ -8238,8 +8188,6 @@ static isl_stat test_union_set_contains(isl_ctx *ctx)
  */
 static int test_union_map(isl_ctx *ctx)
 {
-	if (test_un_union_map(ctx) < 0)
-		return -1;
 	if (test_bin_union_map(ctx) < 0)
 		return -1;
 	if (test_union_set_contains(ctx) < 0)
@@ -8275,6 +8223,7 @@ static isl_stat test_union_pw_op(isl_ctx *ctx, const char *a, const char *b,
 int test_union_pw(isl_ctx *ctx)
 {
 	int equal;
+	isl_stat r;
 	const char *str;
 	isl_union_set *uset;
 	isl_union_pw_qpolynomial *upwqp1, *upwqp2;
@@ -8311,6 +8260,16 @@ int test_union_pw(isl_ctx *ctx)
 	a = "{ A[x] -> 1 }";
 	b = "{ A[x] -> 1 }";
 	if (test_union_pw_op(ctx, a, b, &isl_union_pw_qpolynomial_sub, str) < 0)
+		return -1;
+
+	str = "{ [A[x] -> B[y,z]] -> x^2 + y * floor(x/4) * floor(z/2); "
+		"C[z] -> z^3 }";
+	upwqp1 = isl_union_pw_qpolynomial_read_from_str(ctx, str);
+	upwqp1 = isl_union_pw_qpolynomial_domain_reverse(upwqp1);
+	str = "{ [B[y,z] -> A[x]] -> x^2 + y * floor(x/4) * floor(z/2) }";
+	r = union_pw_qpolynomial_check_plain_equal(upwqp1, str);
+	isl_union_pw_qpolynomial_free(upwqp1);
+	if (r < 0)
 		return -1;
 
 	return 0;

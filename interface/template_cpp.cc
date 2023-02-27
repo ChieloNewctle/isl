@@ -559,11 +559,16 @@ static std::vector<Signature> each_scc =
 static Signature map_from_range_and_domain =
 	{ { Domain, Range }, { { Range }, { Domain } } };
 
-/* Signature for creating a map from a domain,
- * where the range is given by an extra argument.
+
+/* Signatures for creating a set from a parameter set or
+ * a map from a domain,
+ * where the domain/range is given by an extra argument.
  */
+static Signature set_from_params = { { Domain }, { { }, { Domain } } };
 static Signature map_from_domain_and_range =
 	{ { Domain, Range }, { { Domain }, { Range } } };
+static std::vector<Signature> from_domain =
+	{ set_from_params, map_from_domain_and_range };
 
 /* Signatures for creating an anonymous set from a parameter set
  * or a map from a domain, where the range is anonymous.
@@ -573,11 +578,6 @@ static Signature anonymous_map_from_domain =
 	{ { Domain, Anonymous }, { { Domain } } };
 static std::vector<Signature> anonymous_from_domain =
 	{ anonymous_set_from_params, anonymous_map_from_domain };
-
-/* Signature for creating a set from a parameter set,
- * where the domain is given by an extra argument.
- */
-static Signature set_from_params = { { Domain }, { { }, { Domain } } };
 
 /* Signatures for creating an anonymous function from a domain,
  * where the second argument is an identifier (with an anonymous tuple).
@@ -614,7 +614,11 @@ static std::vector<Signature> fn_domain = { domain, set_params };
 
 /* Signatures for interchanging (wrapped) domain and range.
  */
+static Signature set_reverse =
+	{ { { Range, Domain } }, { { { Domain, Range } } } };
 static Signature map_reverse = { { Range, Domain }, { { Domain, Range } } };
+static Signature map_domain_reverse =
+	{ { { Domain2, Domain }, Range }, { { { Domain, Domain2 }, Range } } };
 static Signature map_range_reverse =
 	{ { Domain, { Range2, Range } }, { { Domain, { Range, Range2 } } } };
 
@@ -814,7 +818,10 @@ member_methods {
 				{ domain_factor_range } },
 	{ "domain_map",		{ domain_map } },
 	{ "domain_product",	{ domain_product } },
+	{ "domain_reverse",	{ map_domain_reverse } },
 	{ "drop",		ter_int_int },
+	{ "drop_all_params",	un_op },
+	{ "drop_unused_params",	un_op },
 	{ "eq_at",		{ map_cmp } },
 	{ "every",		each },
 	{ "extract",		bin_op },
@@ -859,7 +866,7 @@ member_methods {
 	{ "min_val",		range_op },
 	{ "min_multi_val",	range_op },
 	{ "mod",		bin_val },
-	{ "on_domain",		{ map_from_domain_and_range } },
+	{ "on_domain",		from_domain },
 	{ "neg",		fn_un_op },
 	{ "offset",		fn_un_op },
 	{ "param_on_domain",	anonymous_from_domain_bin_anon },
@@ -910,6 +917,7 @@ member_methods {
 	{ "unwrap",		{ unwrap } },
 	{ "upper_bound",	fn_bin_op },
 	{ "wrap",		{ wrap } },
+	{ "wrapped_reverse",	{ set_reverse } },
 	{ "zero",		fn_un_op },
 	{ "zero_on_domain",	{ anonymous_map_from_domain } },
 };
