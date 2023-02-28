@@ -57,3 +57,13 @@ test-driver
 isl_srcdir.c
 bound_test.sh
 pip_test.sh
+
+.dirstamp
+
+codegen_test.sh
+flow_test.sh
+schedule_test.sh
+
+interface/extract_interface
+interface/isl.py
+interface/isldlname.py
