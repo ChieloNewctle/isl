@@ -138,15 +138,20 @@ __isl_give isl_basic_map *isl_basic_map_empty(__isl_take isl_space *space);
 __isl_give isl_basic_map *isl_basic_map_universe(__isl_take isl_space *space);
 __isl_give isl_basic_map *isl_basic_map_nat_universe(
 	__isl_take isl_space *space);
+__isl_export
 __isl_give isl_basic_map *isl_basic_map_remove_redundancies(
 	__isl_take isl_basic_map *bmap);
+__isl_export
 __isl_give isl_map *isl_map_remove_redundancies(__isl_take isl_map *map);
+__isl_export
 __isl_give isl_basic_map *isl_map_simple_hull(__isl_take isl_map *map);
 __isl_export
 __isl_give isl_basic_map *isl_map_unshifted_simple_hull(
 	__isl_take isl_map *map);
+__isl_export
 __isl_give isl_basic_map *isl_map_plain_unshifted_simple_hull(
 	__isl_take isl_map *map);
+__isl_export
 __isl_give isl_basic_map *isl_map_unshifted_simple_hull_from_map_list(
 	__isl_take isl_map *map, __isl_take isl_map_list *list);
 
@@ -692,6 +697,7 @@ void isl_map_print_internal(__isl_keep isl_map *map, FILE *out, int indent);
 __isl_give isl_val *isl_map_plain_get_val_if_fixed(__isl_keep isl_map *map,
 	enum isl_dim_type type, unsigned pos);
 
+__isl_export
 __isl_give isl_basic_map *isl_basic_map_gist_domain(
 	__isl_take isl_basic_map *bmap, __isl_take isl_basic_set *context);
 __isl_export
@@ -703,11 +709,13 @@ __isl_give isl_map *isl_map_gist(__isl_take isl_map *map,
 __isl_export
 __isl_give isl_map *isl_map_gist_domain(__isl_take isl_map *map,
 	__isl_take isl_set *context);
+__isl_export
 __isl_give isl_map *isl_map_gist_range(__isl_take isl_map *map,
 	__isl_take isl_set *context);
 __isl_export
 __isl_give isl_map *isl_map_gist_params(__isl_take isl_map *map,
 	__isl_take isl_set *context);
+__isl_export
 __isl_give isl_map *isl_map_gist_basic_map(__isl_take isl_map *map,
 	__isl_take isl_basic_map *context);
 

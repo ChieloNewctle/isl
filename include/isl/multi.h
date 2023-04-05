@@ -16,6 +16,7 @@ isl_ctx *isl_multi_##BASE##_get_ctx(					\
 __isl_export								\
 __isl_give isl_space *isl_multi_##BASE##_get_space(			\
 	__isl_keep isl_multi_##BASE *multi);				\
+__isl_export								\
 __isl_give isl_space *isl_multi_##BASE##_get_domain_space(		\
 	__isl_keep isl_multi_##BASE *multi);				\
 __isl_export								\
