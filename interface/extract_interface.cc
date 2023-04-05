@@ -589,11 +589,12 @@ int main(int argc, char *argv[])
 
 	generate(consumer, Clang->getSourceManager());
 
+  auto err = Diags.hasErrorOccurred();
 	delete sema;
 	delete Clang;
 	llvm::llvm_shutdown();
 
-	if (Diags.hasErrorOccurred())
+	if (err)
 		return EXIT_FAILURE;
 	return EXIT_SUCCESS;
 }
