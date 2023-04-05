@@ -501,6 +501,7 @@ CLEANFILES = \
 	interface/isldlname.py \
 	interface/isl.py \
 	interface/isl.pyc \
+	interface/__pycache__/*.pyc \
 	$(CPP_INTERFACES)
 
 DISTCLEANFILES = \

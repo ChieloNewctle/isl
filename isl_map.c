@@ -2657,7 +2657,7 @@ static isl_bool div_involves_vars(__isl_keep isl_basic_map *bmap, int div,
 
 	if (isl_int_is_zero(bmap->div[div][0]))
 		return isl_bool_false;
-	if (isl_seq_first_non_zero(bmap->div[div] + 1 + first, n) >= 0)
+	if (isl_seq_first_non_zero(bmap->div[div] + 1 + 1 + first, n) >= 0)
 		return isl_bool_true;
 
 	for (i = bmap->n_div - 1; i >= 0; --i) {
@@ -2874,10 +2874,14 @@ __isl_give isl_basic_map *isl_basic_map_remove_divs_involving_dims(
 	enum isl_dim_type type, unsigned first, unsigned n)
 {
 	int i;
+	isl_size off;
 
 	if (isl_basic_map_check_range(bmap, type, first, n) < 0)
 		return isl_basic_map_free(bmap);
-	first += isl_basic_map_offset(bmap, type);
+	off = isl_basic_map_var_offset(bmap, type);
+	if (off < 0)
+		return isl_basic_map_free(bmap);
+	first += off;
 
 	for (i = bmap->n_div - 1; i >= 0; --i) {
 		isl_bool involves;
@@ -8449,8 +8453,8 @@ error:
 	return NULL;
 }
 
-#undef TYPE
-#define TYPE isl_map
+#undef BASE
+#define BASE map
 static
 #include "isl_copy_tuple_id_templ.c"
 
@@ -8629,11 +8633,20 @@ __isl_give isl_set *isl_set_intersect_factor_range(__isl_take isl_set *set,
 						set_to_map(range), &control));
 }
 
+#undef BASE
+#define BASE set
+static
+#include "isl_copy_tuple_id_templ.c"
+
 /* Given a map "map" in a space [A -> B] -> C and a set "domain"
  * in the space A, return the intersection.
  *
  * The set "domain" is extended to a set living in the space [A -> B] and
  * the domain of "map" is intersected with this set.
+ *
+ * If "map" has an identifier on the domain tuple,
+ * then this identifier needs to be set on this product
+ * before the intersection is computed.
  */
 __isl_give isl_map *isl_map_intersect_domain_wrapped_domain(
 	__isl_take isl_map *map, __isl_take isl_set *domain)
@@ -8646,6 +8659,8 @@ __isl_give isl_map *isl_map_intersect_domain_wrapped_domain(
 	space = isl_space_domain_wrapped_range(space);
 	factor = isl_set_universe(space);
 	domain = isl_set_product(domain, factor);
+	space = isl_map_peek_space(map);
+	domain = isl_set_copy_tuple_id(domain, isl_dim_set, space, isl_dim_in);
 	return isl_map_intersect_domain(map, domain);
 }
 
@@ -8654,6 +8669,10 @@ __isl_give isl_map *isl_map_intersect_domain_wrapped_domain(
  *
  * The set "domain" is extended to a set living in the space [B -> C] and
  * the range of "map" is intersected with this set.
+ *
+ * If "map" has an identifier on the range tuple,
+ * then this identifier needs to be set on this product
+ * before the intersection is computed.
  */
 __isl_give isl_map *isl_map_intersect_range_wrapped_domain(
 	__isl_take isl_map *map, __isl_take isl_set *domain)
@@ -8666,6 +8685,8 @@ __isl_give isl_map *isl_map_intersect_range_wrapped_domain(
 	space = isl_space_range_wrapped_range(space);
 	factor = isl_set_universe(space);
 	domain = isl_set_product(domain, factor);
+	space = isl_map_peek_space(map);
+	domain = isl_set_copy_tuple_id(domain, isl_dim_set, space, isl_dim_out);
 	return isl_map_intersect_range(map, domain);
 }
 
@@ -14124,10 +14145,13 @@ static __isl_give isl_map *isl_map_preimage_pw_multi_aff_aligned(
 		goto error;
 
 	if (pma->n == 0) {
+		isl_space *space;
+
+		space = isl_pw_multi_aff_get_domain_space(pma);
 		isl_pw_multi_aff_free(pma);
-		res = isl_map_empty(isl_map_get_space(map));
+		space = isl_space_set(isl_map_get_space(map), type, space);
 		isl_map_free(map);
-		return res;
+		return isl_map_empty(space);
 	}
 
 	res = isl_map_preimage_multi_aff(isl_map_copy(map), type,
@@ -14296,6 +14320,167 @@ __isl_give isl_set *isl_set_preimage_multi_pw_aff(__isl_take isl_set *set,
 	__isl_take isl_multi_pw_aff *mpa)
 {
 	return isl_map_preimage_multi_pw_aff(set, isl_dim_set, mpa);
+}
+
+/* Given that inequality "ineq" of "bmap" expresses an upper bound
+ * on the output dimension "pos" in terms of the parameters,
+ * the input dimensions and possibly some integer divisions,
+ * but not any other output dimensions, extract this upper bound
+ * as a function of all dimensions (with zero coefficients
+ * for the output dimensions).
+ *
+ * That is, the inequality is of the form
+ *
+ *	e(...) + c - m x >= 0
+ *
+ * where e does not depend on any other output dimensions.
+ * Return (e(...) + c) / m, with the denominator m in the first position.
+ */
+__isl_give isl_vec *isl_basic_map_inequality_extract_output_upper_bound(
+	__isl_keep isl_basic_map *bmap, int ineq, int pos)
+{
+	isl_ctx *ctx;
+	isl_vec *v;
+	isl_size v_out, total;
+
+	v_out = isl_basic_map_var_offset(bmap, isl_dim_out);
+	total = isl_basic_map_dim(bmap, isl_dim_all);
+	if (v_out < 0 || total < 0)
+		return NULL;
+	ctx = isl_basic_map_get_ctx(bmap);
+	v = isl_vec_alloc(ctx, 1 + 1 + total);
+	if (!v)
+		return NULL;
+	isl_int_neg(v->el[0], bmap->ineq[ineq][1 + v_out + pos]);
+	isl_seq_cpy(v->el + 1, bmap->ineq[ineq], 1 + total);
+	isl_int_set_si(v->el[1 + 1 + v_out + pos], 0);
+
+	return v;
+}
+
+/* Is constraint "c" of "bmap" of the form
+ *
+ *	e(...) + c1 - m x >= 0
+ *
+ * or
+ *
+ *	-e(...) + c2 + m x >= 0
+ *
+ * where m > 1 and e does not involve any other output variables?
+ *
+ * "v_out" is the offset to the output variables.
+ * "d" is the position of x among the output variables.
+ * "v_div" is the offset to the local variables.
+ * "total" is the total number of variables.
+ *
+ * Since the purpose of this function is to use the constraint
+ * to express the output variable as an integer division,
+ * do not allow the constraint to involve any local variables
+ * that do not have an explicit representation.
+ */
+static isl_bool is_potential_div_constraint(__isl_keep isl_basic_map *bmap,
+	isl_int *c, int v_out, int d, int v_div, int total)
+{
+	int i = 0;
+
+	if (isl_int_is_zero(c[1 + v_out + d]))
+		return isl_bool_false;
+	if (isl_int_is_one(c[1 + v_out + d]))
+		return isl_bool_false;
+	if (isl_int_is_negone(c[1 + v_out + d]))
+		return isl_bool_false;
+	if (isl_seq_first_non_zero(c + 1 + v_out, d) != -1)
+		return isl_bool_false;
+	if (isl_seq_first_non_zero(c + 1 + v_out + d + 1,
+				    v_div - (v_out + d + 1)) != -1)
+		return isl_bool_false;
+	for (i = 0; v_div + i < total; ++i) {
+		isl_bool known, involves;
+
+		if (isl_int_is_zero(c[1 + v_div + i]))
+			continue;
+		known = isl_basic_map_div_is_known(bmap, i);
+		if (known < 0 || !known)
+			return known;
+		involves = div_involves_vars(bmap, i, v_out, v_div - v_out);
+		if (involves < 0 || involves)
+			return isl_bool_not(involves);
+	}
+	return isl_bool_true;
+}
+
+/* Look for a pair of constraints
+ *
+ *	e(...) + c1 - m x >= 0		i.e.,		m x <= e(...) + c1
+ *
+ * and
+ *
+ *	-e(...) + c2 + m x >= 0		i.e.,		m x >= e(...) - c2
+ *
+ * that express that the output dimension x at position "pos"
+ * is some integer division of an expression in terms of the parameters,
+ * input dimensions and integer divisions.
+ * If such a pair can be found, then return the index
+ * of the upper bound constraint, m x <= e(...) + c1.
+ * Otherwise, return an index beyond the number of constraints.
+ *
+ * In order for the constraints above to express an integer division,
+ * m needs to be greater than 1 and such that
+ *
+ *	c1 + c2 < m			i.e.,		-c2 >= c1 - (m - 1)
+ *
+ * In particular, this ensures that
+ *
+ *	x = floor((e(...) + c1) / m)
+ */
+isl_size isl_basic_map_find_output_upper_div_constraint(
+	__isl_keep isl_basic_map *bmap, int pos)
+{
+	int i, j;
+	isl_size n_ineq;
+	isl_size v_out, v_div;
+	isl_size total;
+	isl_int sum;
+
+	total = isl_basic_map_dim(bmap, isl_dim_all);
+	v_out = isl_basic_map_var_offset(bmap, isl_dim_out);
+	v_div = isl_basic_map_var_offset(bmap, isl_dim_div);
+	n_ineq = isl_basic_map_n_inequality(bmap);
+	if (total < 0 || v_out < 0 || v_div < 0 || n_ineq < 0)
+		return isl_size_error;
+
+	isl_int_init(sum);
+	for (i = 0; i < n_ineq; ++i) {
+		isl_bool potential;
+
+		potential = is_potential_div_constraint(bmap, bmap->ineq[i],
+						v_out, pos, v_div, total);
+		if (potential < 0)
+			goto error;
+		if (!potential)
+			continue;
+		for (j = i + 1; j < n_ineq; ++j) {
+			if (!isl_seq_is_neg(bmap->ineq[i] + 1,
+					bmap->ineq[j] + 1, total))
+				continue;
+			isl_int_add(sum, bmap->ineq[i][0], bmap->ineq[j][0]);
+			if (isl_int_abs_lt(sum, bmap->ineq[i][1 + v_out + pos]))
+				break;
+		}
+		if (j < n_ineq)
+			break;
+	}
+	isl_int_clear(sum);
+
+	if (i >= n_ineq)
+		return n_ineq;
+	if (isl_int_is_pos(bmap->ineq[j][1 + v_out + pos]))
+		return i;
+	else
+		return j;
+error:
+	isl_int_clear(sum);
+	return isl_size_error;
 }
 
 /* Return a copy of the equality constraints of "bset" as a matrix.

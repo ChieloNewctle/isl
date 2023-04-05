@@ -467,7 +467,7 @@ error:
 }
 
 __isl_give isl_qpolynomial *isl_qpolynomial_reset_domain_space(
-	__isl_keep isl_qpolynomial *qp, __isl_take isl_space *space)
+	__isl_take isl_qpolynomial *qp, __isl_take isl_space *space)
 {
 	return isl_qpolynomial_restore_domain_space(qp, space);
 }
@@ -3572,7 +3572,7 @@ static int *reordering_move(isl_ctx *ctx,
 	return reordering;
 }
 
-/* Move the "n" variables starting at "src_pos" of "local" to "dst_pos".
+/* Move the "n" variables starting at "src_pos" of "qp" to "dst_pos".
  * Only modify the polynomial expression and the local variables of "qp".
  * The caller is responsible for modifying the space accordingly.
  */

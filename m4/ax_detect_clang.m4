@@ -75,6 +75,9 @@ CC="$SAVE_CC"
 AC_LANG_PUSH(C++)
 
 SAVE_CPPFLAGS="$CPPFLAGS"
+SAVE_LDFLAGS="$LDFLAGS"
+SAVE_LIBS="$LIBS"
+
 CPPFLAGS="$CLANG_CXXFLAGS -I$srcdir $CPPFLAGS"
 AC_CHECK_HEADER([clang/Basic/SourceLocation.h], [],
 	[AC_MSG_ERROR([clang header file not found])])
@@ -233,16 +236,40 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 AC_CHECK_HEADER([llvm/Option/Arg.h],
 	[AC_DEFINE([HAVE_LLVM_OPTION_ARG_H], [],
 		   [Define if llvm/Option/Arg.h exists])])
-CPPFLAGS="$SAVE_CPPFLAGS"
 
-SAVE_LDFLAGS="$LDFLAGS"
 LDFLAGS="$CLANG_LDFLAGS $LDFLAGS"
+
+# A test program for checking whether linking against libclang-cpp works.
+m4_define([_AX_DETECT_CLANG_PROGRAM], [AC_LANG_PROGRAM(
+	[[#include <clang/Frontend/CompilerInstance.h>]],
+	[[
+		new clang::CompilerInstance();
+	]])])
 
 # Use single libclang-cpp shared library when available.
 # Otherwise, use a selection of clang libraries that appears to work.
 AC_CHECK_LIB([clang-cpp], [main], [have_lib_clang=yes], [have_lib_clang=no])
 if test "$have_lib_clang" = yes; then
-	CLANG_LIBS="-lclang-cpp $CLANG_LIBS"
+	# The LLVM libraries may be linked into libclang-cpp already.
+	# Linking against them again can cause errors about options
+	# being registered more than once.
+	# Check whether linking against libclang-cpp requires
+	# linking against the LLVM libraries as well.
+	# Fail if linking fails with or without the LLVM libraries.
+	AC_MSG_CHECKING([whether libclang-cpp needs LLVM libraries])
+	LIBS="-lclang-cpp $SAVE_LIBS"
+	AC_LINK_IFELSE([_AX_DETECT_CLANG_PROGRAM], [clangcpp_needs_llvm=no], [
+		LIBS="-lclang-cpp $CLANG_LIBS $SAVE_LIBS"
+		AC_LINK_IFELSE([_AX_DETECT_CLANG_PROGRAM],
+			[clangcpp_needs_llvm=yes],
+			[clangcpp_needs_llvm=unknown])
+	])
+	AC_MSG_RESULT([$clangcpp_needs_llvm])
+	AS_IF([test "$clangcpp_needs_llvm" = "no"],
+			[CLANG_LIBS="-lclang-cpp"],
+	      [test "$clangcpp_needs_llvm" = "yes"],
+			[CLANG_LIBS="-lclang-cpp $CLANG_LIBS"],
+	      [AC_MSG_FAILURE([unable to link against libclang-cpp])])
 else
 	CLANG_LIBS="-lclangBasic -lclangDriver $CLANG_LIBS"
 	CLANG_LIBS="-lclangAnalysis -lclangAST -lclangLex $CLANG_LIBS"
@@ -253,7 +280,9 @@ else
 	CLANG_LIBS="-lclangFrontend -lclangSerialization $CLANG_LIBS"
 fi
 
+CPPFLAGS="$SAVE_CPPFLAGS"
 LDFLAGS="$SAVE_LDFLAGS"
+LIBS="$SAVE_LIBS"
 
 AC_LANG_POP
 ])

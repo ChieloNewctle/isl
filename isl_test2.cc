@@ -217,12 +217,32 @@ static void test_space(isl::ctx ctx)
 }
 
 /* Perform some basic conversion tests.
+ *
+ * In particular, check that a map with an output dimension
+ * that is equal to some integer division over a domain involving
+ * a local variable without a known integer division expression or
+ * to some linear combination of integer divisions
+ * can be converted to a function expressed in the same way.
  */
 static void test_conversion(isl::ctx ctx)
 {
+	C(&isl::set::as_pw_multi_aff, {
+	{ "[N=0:] -> { [] }",
+	  "[N=0:] -> { [] }" },
+	});
+
 	C(&isl::multi_pw_aff::as_set, {
 	{ "[n] -> { [] : n >= 0 } ",
 	  "[n] -> { [] : n >= 0 } " },
+	});
+
+	C(&isl::map::as_pw_multi_aff, {
+	{ "{ [a] -> [a//2] : "
+	    "exists (e0: 8*floor((-a + e0)/8) <= -8 - a + 8e0) }",
+	  "{ [a] -> [a//2] : "
+	    "exists (e0: 8*floor((-a + e0)/8) <= -8 - a + 8e0) }" },
+	{ "{ [a, b] -> [(2*floor((a)/8) + floor((b)/6))] }",
+	  "{ [a, b] -> [(2*floor((a)/8) + floor((b)/6))] }" },
 	});
 }
 
@@ -254,6 +274,12 @@ static void test_preimage(isl::ctx ctx)
 	  "{ A[a] : 0 <= a <= 100 and exists b : a = 3 b }" },
 	{ "{ B[i,j] : j = [(i)/2] } ", "{ A[i,j] -> B[i/3,j] }",
 	  "{ A[i,j] : j = [(i)/6] and exists a : i = 3 a }" },
+	});
+
+	C(arg<isl::pw_multi_aff>(&isl::set::preimage), {
+	{ "{ B[i,j] : 0 <= i < 10 and 0 <= j < 100 }",
+	  "{ A[j,i] -> B[i,j] : false }",
+	  "{ A[j,i] : false }" },
 	});
 
 	C(arg<isl::multi_aff>(&isl::union_map::preimage_domain), {
@@ -320,6 +346,9 @@ static void test_intersect(isl::ctx ctx)
 	{ "{ C[z] -> [A[x] -> B[y]]; E[z] -> [D[x] -> A[y]] }",
 	  "{ A[0] }",
 	  "{ }" },
+	{ "{ T[A[x] -> B[y]] -> C[z]; [D[x] -> A[y]] -> E[z] }",
+	  "{ A[0] }",
+	  "{ T[A[0] -> B[y]] -> C[z] }" },
 	});
 
 	C(&isl::union_map::intersect_range_wrapped_domain, {
@@ -329,6 +358,9 @@ static void test_intersect(isl::ctx ctx)
 	{ "{ C[z] -> [A[x] -> B[y]]; E[z] -> [D[x] -> A[y]] }",
 	  "{ A[0] }",
 	  "{ C[z] -> [A[0] -> B[y]] }" },
+	{ "{ C[z] -> T[A[x] -> B[y]]; E[z] -> [D[x] -> A[y]] }",
+	  "{ A[0] }",
+	  "{ C[z] -> T[A[0] -> B[y]] }" },
 	});
 }
 
@@ -336,6 +368,11 @@ static void test_intersect(isl::ctx ctx)
  */
 static void test_gist(isl::ctx ctx)
 {
+	C(arg<isl::set>(&isl::pw_aff::gist), {
+	{ "{ [x] -> [x] : x != 0 }", "{ [x] : x < -1 or x > 1 }",
+	  "{ [x] -> [x] }" },
+	});
+
 	C(&isl::pw_aff::gist_params, {
 	{ "[N] -> { D[x] -> [x] : N >= 0; D[x] -> [0] : N < 0 }",
 	  "[N] -> { : N >= 0 }",
