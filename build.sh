@@ -11,7 +11,7 @@ if [ ! -e "./isl_config.h" ]; then
 fi
 
 if [ ! -e "./gitversion.h" ]; then
-  make gitversion.h
+  make "$@" gitversion.h
 fi
 
 make "$@" libisl.la interface/isl.py
