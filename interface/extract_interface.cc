@@ -589,7 +589,7 @@ int main(int argc, char *argv[])
 
 	generate(consumer, Clang->getSourceManager());
 
-  auto err = Diags.hasErrorOccurred();
+	auto err = Diags.hasErrorOccurred();
 	delete sema;
 	delete Clang;
 	llvm::llvm_shutdown();
