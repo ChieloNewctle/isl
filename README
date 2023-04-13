@@ -57,4 +57,3 @@ Building the library requires:
 - automake, autoconf, libtool
 - pkg-config
 - libclang-dev, for interface extraction
-
