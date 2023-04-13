@@ -1146,8 +1146,9 @@ void python_generator::print(const isl_class &clazz)
 	print_upcast_constructors(clazz);
 	printf("        raise Error\n");
 	printf("    def __del__(self):\n");
-	printf("        if hasattr(self, 'ptr'):\n");
+	printf("        if hasattr(self, 'ptr') and self.ptr is not None:\n");
 	printf("            isl.%s_free(self.ptr)\n", clazz.name.c_str());
+	printf("        self.ptr = None\n");
 
 	print_new(clazz, p_name);
 	print_representation(clazz, p_name);

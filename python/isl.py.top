@@ -36,14 +36,16 @@ class Context:
         self.ptr = ptr
 
     def __del__(self):
-        isl.isl_ctx_free(self)
+        if hasattr(self, 'ptr') and self.ptr is not None:
+            isl.isl_ctx_free(self)
+        self.ptr = None
 
     def from_param(self):
         return c_void_p(self.ptr)
 
     @staticmethod
     def getDefaultInstance():
-        if Context.defaultInstance == None:
+        if Context.defaultInstance is None or Context.defaultInstance.ptr is None:
             Context.defaultInstance = Context()
         return Context.defaultInstance
 
