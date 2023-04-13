@@ -3938,3 +3938,10 @@ __isl_give char *isl_ast_node_to_C_str(__isl_keep isl_ast_node *node)
 
 	return str;
 }
+
+isl_bool isl_ast_node_has_annotation(__isl_keep isl_ast_node *node)
+{
+	if (!node)
+		return isl_bool_error;
+	return node->annotation != NULL;
+}
