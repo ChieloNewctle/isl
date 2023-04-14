@@ -1394,6 +1394,7 @@ isl_stat isl_union_pw_aff_foreach_pw_aff(__isl_keep isl_union_pw_aff *upa,
 	isl_stat (*fn)(__isl_take isl_pw_aff *pa, void *user), void *user);
 isl_bool isl_union_pw_aff_every_pw_aff(__isl_keep isl_union_pw_aff *upa,
 	isl_bool (*test)(__isl_keep isl_pw_aff *pa, void *user), void *user);
+__isl_export
 __isl_give isl_pw_aff *isl_union_pw_aff_extract_pw_aff(
 	__isl_keep isl_union_pw_aff *upa, __isl_take isl_space *space);
 
