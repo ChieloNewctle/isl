@@ -135,8 +135,10 @@ __isl_give isl_basic_set *isl_basic_set_sample(__isl_take isl_basic_set *bset);
 __isl_export
 __isl_give isl_basic_set *isl_basic_set_detect_equalities(
 						__isl_take isl_basic_set *bset);
+__isl_export
 __isl_give isl_basic_set *isl_basic_set_remove_redundancies(
 	__isl_take isl_basic_set *bset);
+__isl_export
 __isl_give isl_set *isl_set_remove_redundancies(__isl_take isl_set *set);
 __isl_give isl_basic_set *isl_basic_set_list_intersect(
 	__isl_take struct isl_basic_set_list *list);
@@ -268,6 +270,7 @@ isl_stat isl_basic_set_dims_get_sign(__isl_keep isl_basic_set *bset,
 	enum isl_dim_type type, unsigned pos, unsigned n, int *signs);
 
 isl_bool isl_basic_set_plain_is_universe(__isl_keep isl_basic_set *bset);
+__isl_export
 isl_bool isl_basic_set_is_universe(__isl_keep isl_basic_set *bset);
 isl_bool isl_basic_set_plain_is_empty(__isl_keep isl_basic_set *bset);
 __isl_export
@@ -317,6 +320,7 @@ __isl_give isl_basic_set *isl_set_bounded_simple_hull(__isl_take isl_set *set);
 
 __isl_export
 __isl_give isl_set *isl_set_wrapped_reverse(__isl_take isl_set *set);
+__isl_export
 __isl_give isl_set *isl_set_union_disjoint(
 	__isl_take isl_set *set1, __isl_take isl_set *set2);
 __isl_export
@@ -326,8 +330,10 @@ __isl_give isl_set *isl_set_union(
 __isl_export
 __isl_give isl_set *isl_set_product(__isl_take isl_set *set1,
 	__isl_take isl_set *set2);
+__isl_export
 __isl_give isl_basic_set *isl_basic_set_flat_product(
 	__isl_take isl_basic_set *bset1, __isl_take isl_basic_set *bset2);
+__isl_export
 __isl_give isl_set *isl_set_flat_product(__isl_take isl_set *set1,
 	__isl_take isl_set *set2);
 __isl_export
@@ -337,8 +343,10 @@ __isl_give isl_set *isl_set_intersect(
 __isl_export
 __isl_give isl_set *isl_set_intersect_params(__isl_take isl_set *set,
 		__isl_take isl_set *params);
+__isl_export
 __isl_give isl_set *isl_set_intersect_factor_domain(__isl_take isl_set *set,
 	__isl_take isl_set *domain);
+__isl_export
 __isl_give isl_set *isl_set_intersect_factor_range(__isl_take isl_set *set,
 	__isl_take isl_set *range);
 __isl_export
@@ -394,6 +402,7 @@ __isl_export
 __isl_give isl_set *isl_set_project_out_all_params(__isl_take isl_set *set);
 __isl_give isl_map *isl_set_project_onto_map(__isl_take isl_set *set,
 	enum isl_dim_type type, unsigned first, unsigned n);
+__isl_export
 __isl_give isl_basic_set *isl_basic_set_remove_divs(
 	__isl_take isl_basic_set *bset);
 __isl_give isl_basic_set *isl_basic_set_eliminate(
@@ -410,9 +419,12 @@ __isl_give isl_basic_set *isl_basic_set_remove_divs_involving_dims(
 	enum isl_dim_type type, unsigned first, unsigned n);
 __isl_give isl_set *isl_set_remove_divs_involving_dims(__isl_take isl_set *set,
 	enum isl_dim_type type, unsigned first, unsigned n);
+__isl_export
 __isl_give isl_basic_set *isl_basic_set_remove_unknown_divs(
 	__isl_take isl_basic_set *bset);
+__isl_export
 __isl_give isl_set *isl_set_remove_unknown_divs(__isl_take isl_set *set);
+__isl_export
 __isl_give isl_set *isl_set_remove_divs(__isl_take isl_set *set);
 __isl_give isl_set *isl_set_split_dims(__isl_take isl_set *set,
 	enum isl_dim_type type, unsigned first, unsigned n);
