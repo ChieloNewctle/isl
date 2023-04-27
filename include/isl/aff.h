@@ -847,6 +847,9 @@ __isl_give isl_pw_multi_aff *isl_pw_multi_aff_union_lexmax(
 __isl_export
 __isl_give isl_multi_aff *isl_multi_aff_flatten_domain(
 	__isl_take isl_multi_aff *ma);
+__isl_export
+__isl_give isl_pw_multi_aff *isl_pw_multi_aff_flatten_domain(
+	__isl_take isl_pw_multi_aff *pma);
 
 __isl_export
 __isl_give isl_pw_multi_aff *isl_pw_multi_aff_range_product(
@@ -1290,6 +1293,7 @@ __isl_give isl_set *isl_set_from_multi_pw_aff(__isl_take isl_multi_pw_aff *mpa);
 __isl_export
 __isl_give isl_map *isl_multi_pw_aff_as_map(__isl_take isl_multi_pw_aff *mpa);
 __isl_give isl_map *isl_map_from_multi_pw_aff(__isl_take isl_multi_pw_aff *mpa);
+__isl_export
 __isl_give isl_pw_multi_aff *isl_pw_multi_aff_from_multi_pw_aff(
 	__isl_take isl_multi_pw_aff *mpa);
 __isl_export

@@ -4221,6 +4221,24 @@ __isl_give isl_multi_aff *isl_multi_aff_flatten_domain(
 	return ma;
 }
 
+__isl_give isl_pw_multi_aff *isl_pw_multi_aff_flatten_domain(
+	__isl_take isl_pw_multi_aff *pma)
+{
+	isl_space *space;
+
+	if (!pma)
+		return NULL;
+
+	if (!isl_pw_multi_aff_peek_space(pma)->nested[0])
+		return pma;
+
+	space = isl_pw_multi_aff_get_space(pma);
+	space = isl_space_flatten_domain(space);
+	pma = isl_pw_multi_aff_reset_space(pma, space);
+
+	return pma;
+}
+
 /* Given a map space, return an isl_multi_aff that maps a wrapped copy
  * of the space to its domain.
  */
